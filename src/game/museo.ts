@@ -8,7 +8,7 @@ import { visual, type Escena } from '../visual/museo';
 export const SEGUNDOS_SENALAR = 1.5;
 /** Duración del fundido a negro (s): la mitad oscurece, la mitad aclara. */
 export const DURACION_FUNDIDO_S = 1.0;
-export type VitrinaId = 'vitrina_lrv' | 'vitrina_perseverance' | 'vitrina_cassini';
+export type VitrinaId = 'vitrina_lrv' | 'vitrina_cassini';
 export type Mision = Escena;
 
 /**
@@ -17,7 +17,6 @@ export type Mision = Escena;
  */
 const MISION_DE: Record<VitrinaId, Mision | null> = {
   vitrina_lrv: 'luna',
-  vitrina_perseverance: 'marte',
   vitrina_cassini: null,
 };
 

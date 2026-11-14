@@ -16,15 +16,12 @@ export interface ConfigModelo {
 export const MODELOS: readonly ConfigModelo[] = [
   { id: 'museo', ruta: 'placeholder:sala', nodo: 'museo', escala: 1 },
   { id: 'vitrina_lrv', ruta: 'placeholder:vitrina_lrv', nodo: 'vitrina_lrv', escala: 1 },
-  { id: 'vitrina_perseverance', ruta: 'placeholder:vitrina_perseverance', nodo: 'vitrina_perseverance', escala: 1 },
   { id: 'vitrina_cassini', ruta: 'placeholder:vitrina_cassini', nodo: 'vitrina_cassini', escala: 1 },
   { id: 'mentor', ruta: 'placeholder:mentor', nodo: 'mentor', escala: 0.8 },
 ];
 
 // Escenas de misión. Cada escena es un grupo con el nombre `nodo`. La lunar (Apollo 17) se construye en
-// src/visual/lunaEscena.ts, con los hijos `lrv_placeholder`, `roca_placeholder` y `halo_roca`; la marciana, en
-// src/visual/museo.ts, con `perseverance_placeholder`.
+// src/visual/lunaEscena.ts, con los hijos `lrv_placeholder`, `roca_placeholder` y `halo_roca`.
 export const ESCENAS: readonly ConfigModelo[] = [
   { id: 'escena_luna', ruta: 'placeholder:escena_luna', nodo: 'escena_luna', escala: 1 },
-  { id: 'escena_marte', ruta: 'placeholder:escena_marte', nodo: 'escena_marte', escala: 1 },
 ];

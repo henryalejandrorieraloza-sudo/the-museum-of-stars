@@ -40,9 +40,7 @@ export const HIST = {
   cubierta: 0xd7c48a,
   asiento: 0xcfc8b4,
   antena: 0xe6e2d6,
-  /** Perseverance: cuerpo blanco, ruedas de aluminio, generador oscuro con aletas. */
-  blancoRover: 0xe8e6dc,
-  ruedaRover: 0xa8a8a0,
+  /** Generador oscuro con aletas (RTG de Cassini). */
   generador: 0x2f2d2b,
   lente: 0x15161a,
   /** Cassini: manta térmica dorada, antena de alta ganancia gris, cubierta del motor y generadores negros. */
