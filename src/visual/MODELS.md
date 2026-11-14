@@ -1,0 +1,49 @@
+# Modelos del museo
+
+Cada fila es una entrada de `MODELOS` en `src/visual/config.ts`. Para cambiar un modelo por el de Blender, solo se cambia su `ruta` (un `.glb` en `public/`) y su `escala`.
+
+Convención para el modelo final: 1 unidad de Blender = 1 metro, sin escalar en la exportación. Con eso, la escala queda en `1`.
+
+| id | Nombre del nodo | Placeholder actual | Escala esperada (modelo final) |
+| --- | --- | --- | --- |
+| `museo` | `museo` | Sala circular oscura de 32 m generada en `arquitectura.ts`: suelo con órbitas de luz, paredes negras y lisas, falso techo y cúpula negra sin luces, cascada de planetas luminosos colgando, Saturn V central y decoración (`props.ts`). | 1 |
+| `vitrina_lrv` | `vitrina_lrv` | Pedestal octogonal de 0.85 m con un emisor en lo alto y el LRV de exhibición como holograma azul que flota a 1.45 m, a tamaño real aproximado y girando despacio (`holograma.ts`). Sin cristal. | 1 |
+| `vitrina_perseverance` | `vitrina_perseverance` | Igual que `vitrina_lrv`, con Perseverance de exhibición (holograma a escala 0.85). A 9 m de distancia (x = +4.5 frente a x = −4.5). | 1 |
+| `vitrina_cassini` | `vitrina_cassini` | Igual que `vitrina_lrv`, con Cassini de exhibición tumbada (holograma a escala 0.45, acento magenta, paisajes de Titán en la corona). Al fondo de la sala, entre los dos cohetes (0, −10.5). Sin misión: el mentor la explica y se deselecciona sola. | 1 |
+| `mentor` | `mentor` | Robot compacto flotante: cuerpo azul facetado, visor oscuro, ojos y sonrisa claros, brazos cortos y sin piernas. | 0.8 |
+
+Notas:
+- Los pedestales (los ids siguen llamándose `vitrina_*`) no están en `config.ts` porque su posición es de diseño: se fija en `POSICION_VITRINA` de `src/visual/museo.ts`.
+- El origen de cada modelo debe quedar en el suelo y centrado en la vitrina; el punto de apuntado es el centro del holograma (2.2 m). El volumen invisible que prueba el cursor es de 4 m de lado.
+
+## Objetos de exhibición
+
+Están en `src/visual/props.ts`. **Son formas simplificadas, con proporciones aproximadas a partir de datos públicos; no son planos oficiales ni se han comprobado con documentación técnica.**
+
+| Objeto | Lo que sí representa | Simplificación |
+| --- | --- | --- |
+| LRV | Unos 3.1 m de largo, chasis en tres secciones, cuatro ruedas de malla con chevrones, dos asientos, mando en T, plato, antena helicoidal y cámara | Sin cableado ni instrumentos; ruedas macizas en vez de malla |
+| Perseverance | Unos 3 × 2.7 × 2.2 m, seis ruedas con balancín, mástil con cámaras, brazo con torreta, generador con aletas y antena hexagonal | Instrumentos reducidos a cajas; brazo plegado aproximado |
+| Cassini | Unos 6.8 m de alto, antena de alta ganancia de 4 m con subreflector en trípode, dos tanques envueltos en manta dorada, bus de doce bahías, sonda Huygens de 2.7 m a un lado, tres generadores con aletas, cubierta negra del motor y brazo del magnetómetro de 11 m | Tumbada (eje en horizontal) para caber en la vitrina; antenas RPWS acortadas de 10 m a 3.2 m; instrumentos reducidos a cajas y cilindros; manta térmica como ondas en el radio |
+| Traje A7LB | Traje blanco, visor dorado, mochila, conectores azul y rojo; franjas rojas del comandante en una de las dos cápsulas | Sin capa exterior de detalle; no representa un traje concreto de un astronauta |
+| Saturn V | Escala 1:13 (8.5 m), etapas, patrón negro y torre de escape | Patrón de balanceo aproximado |
+| Atlas V 541 | Escala 1:13 (4.48 m), etapa central naranja salmón, cuatro aceleradores y cofia blanca | Sin marcas ni detalle de superficie |
+
+## Escenas de misión (placeholders)
+
+Se definen en `ESCENAS` de `src/visual/config.ts`. Cada escena es un grupo; se muestra solo una a la vez.
+
+| id | Nombre del nodo | Contenido placeholder | Escala esperada (modelo final) |
+| --- | --- | --- | --- |
+| `escena_luna` | `escena_luna` | Taurus-Littrow (Apollo 17), en `lunaEscena.ts`: suelo de 3.2 km de radio con la curvatura lunar, cráteres, rocas instanciadas y regolito procedural (`lunaTerreno.ts`, `regolito.ts`), macizos, Sol, Tierra y estrellas reales, y el LM Challenger (`moduloLunar.ts`). Hijos: `lrv_placeholder` (LRV de `lrv.ts`, 3.05 m de largo) y `roca_placeholder` (roca de ~0.9 m con el halo azul celeste `halo_roca`: anillo de 0.75 m de radio a 0.3 m de altura). Posiciones en `sitioApollo17.ts`. | 1 |
+| `escena_marte` | `escena_marte` | Suelo rojizo de 60 × 60 m. Cielo claro (fondo de la escena). Hijo: `perseverance_placeholder` (Perseverance aproximado, unos 1.8 m de ancho, en (0, 0, −4)). | 1 |
+
+Notas:
+- Los hijos tienen posición fija en el placeholder. Al cambiar un hijo por un `.glb`, mantén su nombre.
+- **Perseverance de la escena de Marte es una forma simplificada, no medidas oficiales.** Tiene cuerpo blanco con capa dorada, seis ruedas, mástil con cámara, generador (RTG) y brazo (SPEC §0 y §8.6).
+- **Escena lunar:** el LM y el LRV usan las medidas publicadas (Wikipedia, a partir de la NASA, Grumman y Boeing). Lo que no tiene medida verificada lleva `// VERIFICAR` en el código: vía y altura libre del LRV, color de las cubiertas de las baterías y de los guardabarros, reparto de piezas de la etapa de ascenso, guiñada del LM, posición del LRV y de Steno, y altura y distancia de los macizos salvo el Macizo Sur (~2.3 km) y Family Mountain (~1 km). La roca con halo y su cráter están a ~45 m del LRV en vez de los ~1.1 km reales de la estación 1: es una simplificación de juego y los textos lo dicen.
+- LRV y LM de la escena lunar (referencias de Henry de 2026-11-12: modelos de TurboSquid del LM de Apollo 11 y del LRV de Apollo 15, y fotos): low poly facetado, sin superficies suaves, LRV de ~25 000 triángulos y LM de ~18 000. LM: descenso de lámina dorada muy arrugada con faldones y rollos negros, bandera y rótulo en el frente, patas de lámina plateada con cintas doradas y tramo bajo dorado, secundarios oscuros con herrajes plateados, platos dorados, tobera oscura con anillos; ascenso en poliedros (`ConvexGeometry`) de paneles crema y carbón con las juntas marcadas, RCS con toberas plateadas, banda S oscura y radar plateado. LRV: ruedas de malla oscura con chevrones claros, aro con pernos y cubo blanco; guardabarros naranja con riel remachado y bandera; asientos de lona naranja con cintas cruzadas; chasis blanco con piso de listones; consola blanca con panel beige; LCRU y cámara doradas; paraguas de malla gris. Colores en `COLOR_LRV` y `COLOR_LM` (`paleta.ts`), sacados de las capturas de referencia y calibrados con `tests/capturas/modelos/muestras.html`. Cajas envolventes a ±5 % de las anteriores y anclajes (`OJOS_COMANDANTE`, `RUEDAS_LRV`, `BISAGRA_DELANTERA_LRV`) sin cambios (`tests/capturas/modelos/conteo.html`).
+- Colores añadidos a la paleta inicial: ruedas y asiento del LRV en gris muy oscuro (`rueda`) y cabeza del mentor en tono piel (`piel`).
+- La escena de Marte mantiene su estilo provisional: caras planas (`flatShading`), pocos segmentos, sin texturas, luz hemisférica y una direccional, sin sombras, niebla ni bloom. Allí el jugador llega a (0, 1.6, 4) mirando a −Z.
+- En la escena lunar, el LM y el LRV usan el lenguaje del museo (lotes de `paleta.ts`, caras facetadas); el suelo, las rocas y los macizos buscan el aspecto de las fotos de Apollo 17 (ver `spec-visual-museo.md` §10). Sol casi blanco, sombras duras, relleno gris desde el suelo, bloom solo en lo emisivo y sin niebla. El jugador llega a pie junto al LM y al LRV (`LLEGADA` en `sitioApollo17.ts`).
+- Al volver al museo, el jugador recupera su posición y giro.

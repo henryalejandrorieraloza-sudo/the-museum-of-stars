@@ -1,0 +1,8 @@
+node_modules
+dist
+# Generado por scripts/copy-mediapipe-wasm.mjs (predev / prebuild)
+public/wasm
+.DS_Store
+*.local
+# Copias de seguridad locales (no se versionan)
+backup-*/

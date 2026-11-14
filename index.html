@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>The Museum of Stars</title>
+  </head>
+  <body>
+    <main id="scene" class="scene"></main>
+
+    <video id="camara" class="camara" autoplay muted playsinline hidden></video>
+    <div id="aviso" class="aviso" role="status" hidden></div>
+    <!-- Presentación del LRV (src/ui/presentacionUi.ts): fundido, rótulos, peso, ayuda de teclas y "Estás listo".
+         Va por debajo de los subtítulos, que se leen siempre. -->
+    <section id="presentacion" class="presentacion" hidden>
+      <div id="presentacionFundido" class="presentacion-fundido"></div>
+      <div id="presentacionRotulos" class="presentacion-rotulos"></div>
+      <div id="presentacionPeso" class="presentacion-peso" hidden></div>
+      <p id="presentacionAyuda" class="presentacion-ayuda" hidden></p>
+      <h1 id="presentacionListo" class="presentacion-listo" role="status" hidden></h1>
+    </section>
+    <!-- Cinemática del despegue del LM (src/ui/cinematicaUi.ts): grano y viñeta de TV, texto y botón Omitir.
+         Va por encima del fundido a negro de la escena. -->
+    <section id="cinematica" class="cinematica" hidden>
+      <canvas id="cinematicaGrano" class="cinematica-grano" width="192" height="108"></canvas>
+      <div id="cinematicaVineta" class="cinematica-vineta"></div>
+      <p id="cinematicaTexto" class="cinematica-texto"></p>
+      <button id="cinematicaOmitir" class="cinematica-omitir" type="button"></button>
+    </section>
+    <div id="subtitulos" class="subtitulos" hidden></div>
+    <p id="ayuda" class="ayuda"></p>
+    <div id="cursor" class="cursor" hidden></div>
+    <!-- Anillo de mantener E para desplegar el LRV (misión lunar). Lo dibuja src/ui/anillo.ts. -->
+    <div id="anillo" class="anillo" hidden>
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle class="anillo-fondo" cx="24" cy="24" r="20" />
+        <circle class="anillo-progreso" cx="24" cy="24" r="20" transform="rotate(-90 24 24)" />
+      </svg>
+      <span class="anillo-tecla">E</span>
+    </div>
+    <button id="opcionesBoton" class="opciones-boton" type="button"></button>
+    <section id="opciones" class="opciones" hidden></section>
+
+    <!-- Pantalla de inicio "The Museum of Stars": portada, nombre, idioma y control. La rellena src/ui/inicioUi.ts. -->
+    <section id="inicio" class="inicio"></section>
+
+    <section id="mision" class="mision" hidden>
+      <h1 id="misionTitulo"></h1>
+      <button id="volver" type="button"></button>
+    </section>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

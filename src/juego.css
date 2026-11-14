@@ -1,0 +1,883 @@
+/* Overlay del juego sobre la escena 3D. Los textos llegan de src/i18n/es.json. */
+
+[hidden] {
+  display: none !important;
+}
+
+.camara {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 200px;
+  height: 150px;
+  object-fit: cover;
+  transform: scaleX(-1);
+  border-radius: 8px;
+  opacity: 0.85;
+  z-index: 2;
+}
+
+.aviso {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font: 500 16px/1.4 system-ui, sans-serif;
+  text-align: center;
+  z-index: 3;
+}
+
+.subtitulos {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 6vh;
+  max-width: 58ch;
+  margin: 0 auto;
+  padding: 0;
+  text-align: center;
+  /* Estilo de subtítulo de Netflix: texto blanco sin caja, sombra suave proyectada para leerlo sobre cualquier escena. */
+  color: #fff;
+  text-shadow:
+    0 0 2px rgba(0, 0, 0, 0.9),
+    0 2px 4px rgba(0, 0, 0, 0.85),
+    0 0 10px rgba(0, 0, 0, 0.6);
+  font: 500 clamp(18px, 3vh, 34px)/1.3 'Netflix Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.ayuda {
+  position: fixed;
+  left: 16px;
+  top: 16px;
+  margin: 0;
+  max-width: 420px;
+  color: rgba(255, 255, 255, 0.75);
+  font: 400 13px/1.4 system-ui, sans-serif;
+  z-index: 1;
+}
+
+/* Escena de misión: franja superior sobre la escena 3D, que sigue visible debajo. */
+.mision {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: rgba(10, 12, 16, 0.75);
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  z-index: 4;
+}
+
+.mision h1 {
+  margin: 0;
+  font-size: clamp(18px, 3.5vw, 26px);
+  font-weight: 600;
+}
+
+.mision button {
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+  font: 600 16px system-ui, sans-serif;
+  cursor: pointer;
+}
+
+/* Cursor del dedo índice (SPEC 4): círculo sobre la escena, sin capturar clics. */
+.cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid #5cc8ff;
+  background: rgba(92, 200, 255, 0.18);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  transition: opacity 0.2s;
+  z-index: 5;
+}
+
+.cursor.atenuado {
+  opacity: 0.35;
+}
+
+/* Anillo de mantener E (desplegar el LRV): se completa en sentido horario desde arriba. */
+.anillo {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 76px;
+  height: 76px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.anillo svg {
+  width: 100%;
+  height: 100%;
+}
+
+.anillo circle {
+  fill: none;
+  stroke-width: 5;
+}
+
+.anillo-fondo {
+  stroke: rgba(255, 255, 255, 0.28);
+  fill: rgba(0, 0, 0, 0.45) !important;
+}
+
+.anillo-progreso {
+  stroke: #ffd60a;
+  stroke-linecap: round;
+}
+
+.anillo-tecla {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font: 700 24px system-ui, sans-serif;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* Botón y panel de opciones (SPEC 13). */
+.opciones-boton {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font: 500 14px system-ui, sans-serif;
+  cursor: pointer;
+  z-index: 6;
+}
+
+.opciones {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(10, 12, 16, 0.94);
+  color: #fff;
+  font-family: system-ui, sans-serif;
+  z-index: 7;
+  overflow-y: auto;
+}
+
+.opciones h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.opciones-caja {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+  border-radius: 12px;
+  background: #171a21;
+}
+
+.opciones-caja label {
+  display: grid;
+  gap: 6px;
+  font: 400 14px/1.35 system-ui, sans-serif;
+}
+
+.opciones-caja input,
+.opciones-caja select {
+  padding: 8px 10px;
+  border: 1px solid #3a404c;
+  border-radius: 6px;
+  background: #0e1014;
+  color: #fff;
+  font: inherit;
+}
+
+.opciones-caja button {
+  justify-self: end;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+  font: 600 15px system-ui, sans-serif;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .camara {
+    width: 120px;
+    height: 90px;
+    bottom: 8px;
+    right: 8px;
+  }
+}
+
+/* Pantalla de inicio "The Museum of Stars": remolino de estelas de estrellas (src/ui/remolinoEstelar.ts) y, encima, la portada
+   y los pasos de nombre, idioma y control (src/ui/inicioUi.ts). Tapa la escena del museo mientras carga. */
+.inicio {
+  --inicio-azul: #8fb4ff;
+  --inicio-crema: #f3d6c2;
+  --inicio-naranja: #ff8a55;
+  --inicio-texto: #eef2ff;
+  --inicio-tenue: rgba(220, 228, 255, 0.72);
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: #020309;
+  color: var(--inicio-texto);
+  font-family: 'Avenir Next', 'Avenir', 'Segoe UI', system-ui, sans-serif;
+  z-index: 20;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.inicio[hidden] {
+  display: none;
+}
+
+.inicio--saliendo {
+  opacity: 0;
+  transform: scale(1.06);
+  pointer-events: none;
+}
+
+.inicio-remolino,
+.inicio-velo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Sin WebGL2: degradado fijo con los colores del remolino. */
+.inicio-remolino--fijo {
+  background:
+    radial-gradient(ellipse 45% 35% at 0% 56%, rgba(200, 220, 255, 0.6) 0%, rgba(60, 110, 200, 0.5) 40%, rgba(20, 45, 110, 0) 100%),
+    linear-gradient(180deg, #03050d 0%, #0d2252 35%, #1d3f86 70%, #b4483a 100%);
+}
+
+/* Oscurece el centro, donde va el texto, para que se lea sobre el remolino. */
+.inicio-velo {
+  background:
+    radial-gradient(ellipse 60% 45% at 50% 50%, rgba(2, 3, 9, 0.55) 0%, rgba(2, 3, 9, 0) 70%),
+    linear-gradient(180deg, rgba(2, 3, 9, 0.35) 0%, rgba(2, 3, 9, 0) 40%, rgba(2, 3, 9, 0) 75%, rgba(2, 3, 9, 0.45) 100%);
+  pointer-events: none;
+}
+
+/* En los pasos (nombre, idioma, control) hay más texto: se oscurece más la zona del formulario. */
+.inicio-velo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 52% 48% at 50% 50%, rgba(2, 3, 9, 0.82) 0%, rgba(2, 3, 9, 0.5) 55%, rgba(2, 3, 9, 0) 85%);
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+.inicio--pasos .inicio-velo::after {
+  opacity: 1;
+}
+
+.inicio-contenido {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  max-height: 100%;
+  overflow-y: auto;
+  /* Margen interno para que el brillo de los botones no se recorte en el borde del contenedor. */
+  padding: 32px 12px;
+}
+
+.inicio-paso {
+  display: grid;
+  gap: 22px;
+  animation: inicio-entrar 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes inicio-entrar {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+/* Portada */
+.inicio-portada {
+  justify-items: center;
+  text-align: center;
+  gap: 18px;
+}
+
+.inicio-antetitulo {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.42em;
+  /* letter-spacing deja espacio tras la última letra: se compensa para que quede centrado. */
+  padding-left: 0.42em;
+  text-transform: uppercase;
+  color: var(--inicio-azul);
+  text-shadow: 0 0 18px rgba(80, 130, 255, 0.6);
+}
+
+.inicio-titulo {
+  margin: 0;
+  font-size: clamp(38px, 8.5vw, 76px);
+  font-weight: 200;
+  line-height: 1.02;
+  letter-spacing: 0.06em;
+  padding-left: 0.06em;
+  text-transform: uppercase;
+  background: linear-gradient(100deg, #ffffff 0%, #c9dcff 38%, #f3d6c2 64%, #ff8a55 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 22px rgba(120, 160, 255, 0.35));
+  text-wrap: balance;
+}
+
+.inicio-lema {
+  margin: 0;
+  max-width: 440px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--inicio-tenue);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.9);
+  text-wrap: pretty;
+}
+
+.inicio-pista {
+  margin: -6px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  padding-left: 0.12em;
+  color: rgba(220, 228, 255, 0.45);
+}
+
+/* Botón principal: cápsula transparente con borde fino claro. */
+.inicio-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 16px 34px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.8);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: 0 0 22px rgba(140, 180, 255, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+}
+
+.inicio-cta:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #fff;
+  box-shadow: 0 0 32px rgba(160, 195, 255, 0.45);
+}
+
+.inicio-cta:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.inicio-cta-flecha {
+  transition: transform 0.2s ease;
+}
+
+.inicio-cta:hover:not(:disabled) .inicio-cta-flecha {
+  transform: translateX(4px);
+}
+
+.inicio-portada .inicio-cta {
+  animation: inicio-latido 2.8s ease-in-out 1s infinite;
+}
+
+@keyframes inicio-latido {
+  0%,
+  100% {
+    box-shadow: 0 0 22px rgba(140, 180, 255, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 38px rgba(170, 200, 255, 0.55);
+  }
+}
+
+/* Pasos */
+.inicio-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+}
+
+.inicio-atras {
+  padding: 6px 2px;
+  border: 0;
+  background: none;
+  color: var(--inicio-tenue);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.inicio-atras:hover {
+  color: #fff;
+}
+
+.inicio-puntos {
+  display: flex;
+  gap: 6px;
+}
+
+.inicio-puntos i {
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(220, 228, 255, 0.28);
+}
+
+.inicio-puntos i.activo {
+  background: linear-gradient(90deg, #8fb4ff, #ff8a55);
+}
+
+.inicio-pregunta {
+  margin: 0;
+  font-size: clamp(26px, 5.4vw, 38px);
+  font-weight: 300;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.9);
+  text-wrap: pretty;
+}
+
+.inicio-formulario {
+  display: grid;
+  gap: 18px;
+  justify-items: start;
+}
+
+.inicio-entrada {
+  width: 100%;
+  padding: 14px 4px;
+  border: 0;
+  border-bottom: 1px solid rgba(220, 228, 255, 0.35);
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: clamp(24px, 5vw, 32px);
+  font-weight: 300;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.inicio-entrada::placeholder {
+  color: rgba(220, 228, 255, 0.35);
+}
+
+.inicio-entrada:focus {
+  border-bottom-color: var(--inicio-azul);
+  box-shadow: 0 10px 18px -16px rgba(143, 180, 255, 0.9);
+}
+
+.inicio-opciones {
+  display: grid;
+  gap: 12px;
+}
+
+.inicio-opciones--dos {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.inicio-opcion {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: center;
+  padding: 18px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 16px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.85);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.inicio-opcion:hover,
+.inicio-opcion:focus-visible {
+  border-color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.07);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.inicio-opcion.marcada {
+  border-color: rgba(255, 255, 255, 0.85);
+}
+
+.inicio-opcion--idioma {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  padding: 22px 20px;
+}
+
+.inicio-opcion--idioma strong {
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+.inicio-icono svg {
+  display: block;
+  width: 34px;
+  height: 34px;
+  fill: none;
+  stroke: var(--inicio-azul);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.inicio-icono circle {
+  fill: var(--inicio-azul);
+  stroke: none;
+}
+
+.inicio-opcion-texto {
+  display: grid;
+  gap: 4px;
+}
+
+.inicio-opcion-texto strong {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.inicio-opcion-texto small {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--inicio-tenue);
+}
+
+.inicio-etiqueta {
+  justify-self: start;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--inicio-naranja);
+}
+
+.inicio-error {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(200, 70, 60, 0.25);
+  border: 1px solid rgba(255, 120, 110, 0.6);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.inicio button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  .inicio-contenido {
+    margin-bottom: 22vh;
+  }
+  .inicio-antetitulo {
+    letter-spacing: 0.28em;
+  }
+  .inicio-cta {
+    padding: 15px 26px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inicio-paso,
+  .inicio-portada .inicio-cta {
+    animation: none;
+  }
+}
+
+/* Fila de Opciones con el control actual y el botón "Cambiar control". */
+.opciones-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font: 400 14px/1.35 system-ui, sans-serif;
+}
+
+.opciones-caja .opciones-fila button {
+  justify-self: auto;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+/* Presentación del LRV (src/ui/presentacionUi.ts). Encima de la escena y por debajo de los subtítulos (z-index 3). */
+.presentacion {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.presentacion-fundido {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+}
+
+.presentacion-rotulos {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Rótulo de una pieza: texto blanco en negrita sobre una caja oscura, como en la referencia. */
+.presentacion-rotulo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  max-width: min(360px, 70vw);
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: rgba(10, 12, 16, 0.72);
+  border: 1px solid rgba(135, 206, 235, 0.55);
+  color: #fff;
+  font: 700 clamp(15px, 2vw, 22px)/1.25 Georgia, 'Times New Roman', serif;
+  text-align: center;
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+/* Tarjeta del peso: dos columnas, Tierra y Luna, y la masa debajo. */
+.presentacion-peso {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  padding: 16px 20px 12px;
+  border-radius: 8px;
+  background: rgba(10, 12, 16, 0.78);
+  border: 1px solid rgba(135, 206, 235, 0.55);
+  color: #fff;
+  text-align: center;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.presentacion-peso-fila {
+  display: flex;
+  justify-content: space-around;
+  gap: 16px;
+}
+
+.presentacion-peso-columna {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.presentacion-peso-columna strong {
+  font-size: clamp(28px, 5vw, 44px);
+  line-height: 1.1;
+}
+
+.presentacion-peso-columna span {
+  font: 600 16px/1.3 system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.presentacion-peso p {
+  margin: 10px 0 0;
+  font: 400 14px/1.4 system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.presentacion-ayuda {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.8);
+  font: 500 13px/1.3 system-ui, sans-serif;
+}
+
+/* "Estás listo para la misión": centrado, grande, sobre el último plano oscurecido. */
+.presentacion-listo {
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  right: 16px;
+  transform: translateY(-50%);
+  margin: 0;
+  padding: 24px 16px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font: 700 clamp(28px, 5vw, 52px)/1.2 Georgia, 'Times New Roman', serif;
+  text-align: center;
+  text-shadow: 0 0 12px rgba(0, 0, 0, 0.8);
+}
+
+/* Línea entre las dos mitades de la vista dividida (escena del mando de la presentación del LRV). */
+.presentacion-division {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+.presentacion-division[hidden] {
+  display: none;
+}
+
+/* Cinemática del despegue (src/ui/cinematicaUi.ts). Encima del fundido a negro de la escena (z-index 100, visual/museo.ts),
+   para que el botón Omitir se vea siempre. El grano, la viñeta y las líneas solo se ven en las tomas de TV y de película. */
+.cinematica {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 101;
+}
+
+.cinematica-grano {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  mix-blend-mode: screen;
+}
+
+.cinematica-vineta {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at center, transparent 48%, rgba(0, 0, 0, 0.55) 80%, rgba(0, 0, 0, 0.92) 100%);
+}
+
+.cinematica-vineta.pelicula {
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(10, 6, 0, 0.5) 85%, rgba(0, 0, 0, 0.85) 100%);
+}
+
+.cinematica-texto {
+  position: absolute;
+  left: 32px;
+  bottom: 40px;
+  max-width: min(560px, calc(100% - 64px));
+  margin: 0;
+  color: #fff;
+  font: 500 20px/1.5 system-ui, sans-serif;
+  text-align: left;
+  text-shadow:
+    -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000,
+    0 0 8px rgba(0, 0, 0, 0.9);
+  opacity: 0;
+}
+
+.cinematica-omitir {
+  position: absolute;
+  right: 24px;
+  bottom: 32px;
+  padding: 8px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font: 500 15px/1.2 system-ui, sans-serif;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.cinematica-omitir:hover,
+.cinematica-omitir:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+  outline: none;
+}
+
+.cinematica-omitir[hidden] {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .cinematica-texto {
+    left: 16px;
+    bottom: 84px;
+    max-width: calc(100% - 32px);
+    font-size: 17px;
+  }
+
+  .cinematica-omitir {
+    right: 16px;
+    bottom: 24px;
+  }
+}
