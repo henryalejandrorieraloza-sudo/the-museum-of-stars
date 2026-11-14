@@ -7,6 +7,7 @@ import {
   aplauso,
   aplausoEstadoInicial,
   pellizco,
+  PUNO_GRACIA_S,
   pellizcoDoble,
   pellizcoDobleEstadoInicial,
   volante,
@@ -20,6 +21,7 @@ import {
   headPitchDeg,
   headRollDeg,
   legSample,
+  punoCerrado,
   shoulderWidthPx,
 } from '../tracking/metrics';
 import { Tracker, type TrackingFrame } from '../tracking/tracker';
@@ -60,8 +62,10 @@ export class FuenteCamara implements FuenteEntrada {
   private readonly pellizcosAgarre: Partial<Record<'Left' | 'Right', boolean>> = {};
   /** Barra espaciadora: respaldo del aplauso (SPEC 4). Se consume en la siguiente lectura. */
   private espacioPendiente = false;
-  /** Tecla E mantenida: desplegar el LRV en la misión lunar. Aún no tiene gesto propio. */
+  /** Tecla E mantenida: respaldo del puño cerrado (desplegar, recoger, volver). */
   private eMantenida = false;
+  /** Último instante (s) en que se vio un puño cerrado; el puño se mantiene PUNO_GRACIA_S después. */
+  private ultimoPunoS = Number.NEGATIVE_INFINITY;
   private pausada = false;
   private aviso: string | null;
   /** Último fotograma procesado, para la captura de depuración (tecla P, solo en desarrollo). */
@@ -117,6 +121,7 @@ export class FuenteCamara implements FuenteEntrada {
     if (pausada) {
       this.espacioPendiente = false;
       this.eMantenida = false;
+      this.ultimoPunoS = Number.NEGATIVE_INFINITY;
     }
   }
 
@@ -127,6 +132,7 @@ export class FuenteCamara implements FuenteEntrada {
     if (frame) {
       const conFotograma = this.procesarFotograma(frame, ahoraS, espacio);
       conFotograma.desplegarMantenido = this.eMantenida;
+      conFotograma.punoMantenido = this.punoMantenido(ahoraS);
       return conFotograma;
     }
 
@@ -140,7 +146,13 @@ export class FuenteCamara implements FuenteEntrada {
     lectura.aplauso = lectura.hayDatos;
     lectura.manos = viejo ? 'ocultar' : null;
     lectura.desplegarMantenido = this.eMantenida;
+    lectura.punoMantenido = this.punoMantenido(ahoraS);
     return lectura;
+  }
+
+  /** ¿Sigue el puño cerrado? Cuenta hasta PUNO_GRACIA_S después del último fotograma con puño; pausado, nunca. */
+  private punoMantenido(ahoraS: number): boolean {
+    return !this.pausada && ahoraS - this.ultimoPunoS <= PUNO_GRACIA_S;
   }
 
   /** Procesa un fotograma nuevo: encuadre y calibración, o bien las señales del juego. */
@@ -149,6 +161,7 @@ export class FuenteCamara implements FuenteEntrada {
     const dtS = this.ultimoFrescoS === null ? 0 : Math.min(DT_MAX_S, ahoraS - this.ultimoFrescoS);
     this.ultimoFrescoS = ahoraS;
     this.ultimoDatoS = ahoraS;
+    if (frame.hands.some((m) => punoCerrado(m, frame.width, frame.height))) this.ultimoPunoS = ahoraS;
 
     const lectura = lecturaVacia(ahoraS);
     lectura.dtS = dtS;

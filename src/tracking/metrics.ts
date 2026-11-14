@@ -13,6 +13,7 @@ export const HAND_IDX = {
   wrist: 0,
   thumbTip: 4,
   indexMcp: 5,
+  indexPip: 6,
   middleMcp: 9,
   pinkyMcp: 17,
   indexTip: 8,
@@ -318,6 +319,23 @@ export function otrosDedosExtendidos(hand: TrackedHand, w: number, h: number, ma
     [HAND_IDX.pinkyPip, HAND_IDX.pinkyTip],
   ] as const;
   return pares.every(([pip, punta]) => dist(muneca, toPx(lm[punta], w, h)) > dist(muneca, toPx(lm[pip], w, h)) * margen);
+}
+
+/**
+ * ¿Tiene la mano el puño cerrado? Los cuatro dedos largos doblados: la punta de cada uno queda más cerca de la muñeca
+ * que su articulación media (PIP), por debajo de `margen` (< 1). El pulgar no cuenta: en un puño suele quedar cruzado.
+ * Con el índice estirado (señalar) o con la mano abierta no es un puño.
+ */
+export function punoCerrado(hand: TrackedHand, w: number, h: number, margen = 1.0): boolean {
+  const lm = hand.landmarks;
+  const muneca = toPx(lm[HAND_IDX.wrist], w, h);
+  const pares = [
+    [HAND_IDX.indexPip, HAND_IDX.indexTip],
+    [HAND_IDX.middlePip, HAND_IDX.middleTip],
+    [HAND_IDX.ringPip, HAND_IDX.ringTip],
+    [HAND_IDX.pinkyPip, HAND_IDX.pinkyTip],
+  ] as const;
+  return pares.every(([pip, punta]) => dist(muneca, toPx(lm[punta], w, h)) < dist(muneca, toPx(lm[pip], w, h)) * margen);
 }
 
 /**

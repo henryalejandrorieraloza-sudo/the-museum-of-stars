@@ -129,6 +129,9 @@ const TEXTO_TECLADO: Partial<Record<ClaveTexto, ClaveTexto>> = {
   luna_bajado: 'luna_bajado_teclado',
   luna_bajado_muestra: 'luna_bajado_muestra_teclado',
   luna_despegue_libre: 'luna_despegue_libre_teclado',
+  luna_LRV_plegado: 'luna_LRV_plegado_teclado',
+  luna_suelo_manten: 'luna_suelo_manten_teclado',
+  luna_sentado_en_LRV: 'luna_sentado_en_LRV_teclado',
 };
 
 /** Nombre que el viajero escribió en la pantalla de inicio. Vacío = se usa "explorador" en el idioma activo. */
@@ -413,6 +416,8 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
   }
   modoControl = modo;
   guardarControl(modo);
+  // El anillo de mantener lleva la E con teclado y un puño cerrado con la cámara.
+  anillo.fijarSimbolo(modo === 'teclado' ? 'tecla' : 'puno');
 
   const opcionesUi = crearOpcionesUi(opciones, (nuevas) => Object.assign(opciones, nuevas), {
     modo,
@@ -834,6 +839,16 @@ function aplicarLectura(sesion: Sesion, lectura: LecturaEntrada): void {
   });
 }
 
+/**
+ * ¿Está el jugador manteniendo la acción de carga? Teclado: la tecla E. Cámara: el puño cerrado (o la E, de respaldo).
+ * Sentado en el LRV el puño no cuenta, porque ahí las manos sujetan el volante y suelen ir cerradas.
+ */
+function cargaMantenida(lectura: LecturaEntrada): boolean {
+  if (!lectura.listo) return false;
+  const sentado = mision !== null && !mision.aPie;
+  return lectura.desplegarMantenido || (lectura.punoMantenido && !sentado);
+}
+
 /** ¿Cuenta el aplauso como acción de museo? Dentro de una misión solo vuelve si la fuente lo permite (cámara). */
 function accionDeAplauso(sesion: Sesion, lectura: LecturaEntrada): boolean {
   return lectura.aplauso && (sesion.museo.pantalla.tipo !== 'mision' || lectura.aplausoVuelve);
@@ -849,7 +864,7 @@ function actualizarVolver(sesion: Sesion, lectura: LecturaEntrada, enCinematica:
   const previo = ultimoVolverS;
   ultimoVolverS = lectura.ahoraS;
   const dtS = previo === null ? 0 : Math.min(DT_MAX_DESPLIEGUE_S, Math.max(0, lectura.ahoraS - previo));
-  const mantenida = lectura.listo && lectura.desplegarMantenido;
+  const mantenida = cargaMantenida(lectura);
   if (!mantenida) volverArmado = true;
   const enMision = museo.pantalla.tipo === 'mision' && !enCinematica && !museo.enTransicion;
   const ocupada =
@@ -886,7 +901,7 @@ function actualizarDespliegue(sesion: Sesion, lectura: LecturaEntrada): void {
   const enTransicion = sesion.museo.enTransicion;
   const dtS = previo === null || enTransicion ? 0 : Math.min(DT_MAX_DESPLIEGUE_S, Math.max(0, lectura.ahoraS - previo));
   const estadoPrevio = despliegue.estado;
-  const eventos = despliegue.actualizar(dtS, lectura.listo && lectura.desplegarMantenido && !enTransicion && instruccionDesplegarDicha);
+  const eventos = despliegue.actualizar(dtS, cargaMantenida(lectura) && !enTransicion && instruccionDesplegarDicha);
   // Solo mientras se pliega (y en el fotograma en que se completa, para ocultarlo): después, el anillo es de la recogida.
   if (estadoPrevio === 'plegado' || despliegue.estado === 'plegado') {
     anillo.mostrar(despliegue.estado === 'plegado' && despliegue.anillo > 0 ? despliegue.anillo : null);
@@ -930,7 +945,7 @@ function actualizarSueloNaranja(sesion: Sesion, lectura: LecturaEntrada): void {
     jugador: visual.museo.posicionJugador(),
     lrv: mision.posicion,
     aPie,
-    manteniendoE: lectura.listo && lectura.desplegarMantenido && !enTransicion,
+    manteniendoE: cargaMantenida(lectura) && !enTransicion,
     activo: despliegue.desplegado,
   });
   // Con el LRV plegado, el anillo lo lleva el despliegue: aquí solo se dibuja después de desplegar.

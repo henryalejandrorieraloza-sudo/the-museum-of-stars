@@ -65,7 +65,7 @@ Proyecto educativo y narrativo en una página web pública. El jugador recorre u
 | Mirar arriba o abajo en el museo | Subir o bajar la cabeza (límite ±35°) |
 | Señalar vitrina | Cursor con el dedo índice (por defecto). El rayo desde el hombro queda como opción |
 | Iniciar inmersión | Aplaudir |
-| Desplegar LRV (Apollo 17) | Mantener la tecla E 3 s, en los dos modos de control (aún no tiene gesto) |
+| Desplegar LRV (Apollo 17), recoger muestras y volver al museo desde la misión | Cámara: mantener el puño cerrado 3 s (anillo con un puño dentro). Teclado: mantener la tecla E 3 s. No cuenta sentado en el LRV, donde las manos hacen de volante. Señalar vitrinas sigue siendo con el índice |
 | Conducir LRV | Volante gestual con ambas manos |
 | Avanzar LRV | Subir las rodillas (caminar en el sitio) |
 | Avanzar Perseverance | Inclinar una mano hacia arriba |

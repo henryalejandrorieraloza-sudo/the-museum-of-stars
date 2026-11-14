@@ -173,6 +173,17 @@ export function aplauso(
 }
 
 // ---------------------------------------------------------------------------
+// Puño cerrado mantenido (equivale a mantener la tecla E)
+// ---------------------------------------------------------------------------
+
+/**
+ * Tiempo (s) que el puño sigue contando como cerrado tras el último fotograma en que se vio. Tapa los fallos sueltos
+ * del detector (una mano que parpadea) para que el anillo no se vacíe a mitad de camino; si la mano se abre o
+ * desaparece más tiempo que esto, se suelta.
+ */
+export const PUNO_GRACIA_S = 0.25;
+
+// ---------------------------------------------------------------------------
 // Mínimo reciente (depuración del pellizco)
 // ---------------------------------------------------------------------------
 

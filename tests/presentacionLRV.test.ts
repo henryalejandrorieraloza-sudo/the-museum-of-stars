@@ -128,7 +128,8 @@ test('todas las frases y rótulos existen en español y en inglés', () => {
 test('las cifras y el mando en T dicen lo mismo que la fuente', () => {
   assert.match(es.pres_peso, /460 libras/);
   assert.match(es.pres_peso, /76/);
-  assert.match(en.pres_peso, /mass does not change/);
+  assert.match(en.pres_peso, /460 pounds/);
+  assert.match(en.pres_peso, /76/);
   assert.match(es.pres_intro, /Apolo 15, 16 y 17/);
   // El mando en T: hacia atrás frena; la marcha atrás va con un interruptor (NSSDC).
   assert.match(es.pres_mando_movimientos, /hacia atrás para frenar/);

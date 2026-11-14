@@ -66,6 +66,11 @@ export interface LecturaEntrada {
   bajarse: boolean;
   /** Tecla E mantenida: con el LRV plegado, llena el anillo de desplegarlo (misión lunar). */
   desplegarMantenido: boolean;
+  /**
+   * Puño cerrado mantenido (cámara): hace lo mismo que mantener E, salvo señalar vitrinas. Va aparte de la tecla porque
+   * sentado en el LRV las manos hacen de volante, cerradas, y entonces no debe contar (lo decide juego.ts).
+   */
+  punoMantenido: boolean;
   /** Manos para el avatar: dibujarlas, ocultarlas o dejarlas como están (null). */
   manos: ManosFotograma | 'ocultar' | null;
   /** Caminata para el balanceo lateral de la cámara en el museo. Solo visual (game/balanceo.ts). */
@@ -102,6 +107,7 @@ export function lecturaVacia(ahoraS: number): LecturaEntrada {
     volanteGrados: null,
     bajarse: false,
     desplegarMantenido: false,
+    punoMantenido: false,
     manos: null,
     balanceo: { caminando: false, pasosNuevos: 0, pasosPorSegundo: 0 },
   };
