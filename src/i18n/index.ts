@@ -8,7 +8,8 @@ export type ClaveTexto = keyof typeof es;
 export type Idioma = 'es' | 'en';
 
 const CLAVE_IDIOMA = 'museo-espacial:idioma:v1';
-const TEXTOS: Record<Idioma, Partial<Record<ClaveTexto, string>>> = { es, en };
+// Cada idioma debe tener todas las claves: si falta una en en.json, `tsc` (npm run build) falla aquí.
+const TEXTOS: Record<Idioma, Record<ClaveTexto, string>> = { es, en };
 
 /** Código de voz y de `<html lang>` de cada idioma. */
 export const LENGUA_VOZ: Record<Idioma, string> = { es: 'es-ES', en: 'en-US' };

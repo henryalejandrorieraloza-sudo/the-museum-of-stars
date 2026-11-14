@@ -392,7 +392,7 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
     ui.aviso(t('cargando_museo'));
     await escenaLista;
   } catch (err) {
-    ui.aviso(`Error: ${mensajeDe(err)}`);
+    ui.aviso(t('error_generico', { error: mensajeDe(err) }));
     console.error(err);
     return;
   }

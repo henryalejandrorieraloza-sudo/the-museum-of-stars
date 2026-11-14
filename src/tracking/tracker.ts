@@ -6,6 +6,7 @@ import {
   type NormalizedLandmark,
 } from '@mediapipe/tasks-vision';
 import { assetUrl } from './assets';
+import { t } from '../i18n';
 
 /** Punto 3D en metros, con el origen en el centro de la mano (worldLandmarks de MediaPipe). */
 export interface PuntoMundo {
@@ -60,10 +61,10 @@ export class Tracker {
   ) {}
 
   static async create(onStatus: (message: string) => void = () => {}): Promise<Tracker> {
-    onStatus('Cargando runtime de MediaPipe…');
+    onStatus(t('tracker_runtime'));
     const vision = await FilesetResolver.forVisionTasks(assetUrl('wasm'));
 
-    onStatus('Cargando modelo de cara…');
+    onStatus(t('tracker_cara'));
     const faceLandmarker = await createWithFallback((delegate) =>
       FaceLandmarker.createFromOptions(vision, {
         baseOptions: { modelAssetPath: assetUrl('models/face_landmarker.task'), delegate },
@@ -74,7 +75,7 @@ export class Tracker {
       }),
     );
 
-    onStatus('Cargando modelo de cuerpo…');
+    onStatus(t('tracker_cuerpo'));
     const poseLandmarker = await createWithFallback((delegate) =>
       PoseLandmarker.createFromOptions(vision, {
         baseOptions: { modelAssetPath: assetUrl('models/pose_landmarker_lite.task'), delegate },
@@ -83,7 +84,7 @@ export class Tracker {
       }),
     );
 
-    onStatus('Cargando modelo de manos…');
+    onStatus(t('tracker_manos'));
     const handLandmarker = await createWithFallback((delegate) =>
       HandLandmarker.createFromOptions(vision, {
         baseOptions: { modelAssetPath: assetUrl('models/hand_landmarker.task'), delegate },
