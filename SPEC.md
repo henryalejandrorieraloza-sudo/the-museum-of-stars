@@ -181,7 +181,7 @@ Animación corta e informativa entre la vitrina del LRV y la misión lunar. Guio
 - **Contenido:** solo el LRV (el mismo modelo que se conduce, desplegado y cargado). Sin astronautas, personas ni sus sombras. Suelo de regolito gris, cielo negro con el Sol, la Tierra y las estrellas de la escena lunar, un solo Sol con sombras duras y el mismo render que la misión.
 - **Narrador:** la voz del mentor (el robot del museo), con la misma síntesis y el mismo catálogo de audio grabado. Una frase por tramo; cada tramo dura su mínimo o lo que tarde su frase, lo que sea mayor, así la imagen y los subtítulos no se desfasan. Si la voz nunca avisa del final, el tramo sigue a los 20 s de su mínimo.
 - **Cámara sincronizada con la frase:** cada plano empieza en la palabra que lo pide. En `es.json` y `en.json`, las frases `pres_*` llevan marcas `{@id}` justo antes de esa palabra (no se ven ni se dicen; `src/audio/guion.ts`). El guion de cada tramo (`anclas`, tomas y marcas en `src/game/presentacionLRV.ts`) está escrito en segundos “nominales” (lo que dura la frase en español) y el reloj (`RelojNarrado`) los lleva al tiempo real: cada ancla coincide con su palabra cuando la voz la dice, las que aún no han sonado se prevén con el ritmo de la voz (caracteres por segundo, medido en las frases anteriores o, con audio grabado, tomado de sus tiempos) y el último instante del guion cae en el final de la frase. Así el movimiento se estira o se encoge por idioma y por voz. Una marca que un idioma no tiene (p. ej. “Diseñadas para rodar por otro mundo” en inglés) se ignora con sus tomas y rótulos (`ancla` en `Toma` y `Marca`). Si la voz no avisa de una marca, el guion sigue su previsión. Además, la cámara respira siempre (`movimientoAmbiente`) y la última escena termina en un plano de revelación (el LRV entero y el terreno) que sigue, con una órbita lenta, bajo “Estás listo” (`TRAMO_LISTO`).
-- **Subtítulos:** abajo, sincronizados con la voz. Se apagan y encienden con la tecla C o en Opciones (“Subtítulos en la animación del LRV”).
+- **Subtítulos:** abajo, sincronizados con la voz. Se apagan y encienden con la tecla C durante la animación (ya no hay casilla en Opciones).
 - **Saltar:** Enter, desde la segunda escena (la introducción siempre se ve). Salta a “Estás listo para la misión”. Durante la animación el museo no recibe entradas (ni moverse ni aplaudir).
 - **Escenas, en orden** (guion de unos 126 s de narración en español, más la pausa entre frases y los fundidos; en inglés dura menos porque las frases son más cortas): introducción, peso con la tarjeta de la Tierra y la Luna, distancias, chasis, ruedas, electrónica y navegación (consola, giroscopio y odómetro, cámara y antenas con la Tierra en el cielo), energía con baterías y Mylar, mando y movimiento (vista dividida) y cierre en el suelo naranja del cráter Shorty, con fundidos suaves de 0.8 s entre escenas. Cámara con ease-in-out (curva cúbica monótona entre tomas, sin paradas en cada una), nunca quieta mientras habla el narrador, y con tope de velocidad (zoom ≤ ×1.6 por segundo, giro ≤ 16°/s) para que ningún movimiento sea brusco aunque la voz vaya más deprisa de lo previsto. Las piezas se resaltan con un contorno azul celeste y un rótulo en español que aparecen y se van en 0.5 s. Cada frase explica el porqué en pocas palabras.
 - **Distancias:** vista desde arriba con dos trazos sobre el mismo terreno: el corto (“Caminando”) y el largo (“Con el LRV: 36 km (Apolo 17)”), que se dibuja más rápido. Esquemáticos, con la proporción de 3.45 km a 36 km (EVA-2 del Apolo 14, la más larga a pie, frente al LRV del Apolo 17; NSSDC). No son recorridos reales.
@@ -323,23 +323,15 @@ No se guardan muestras recogidas como progreso.
 
 ## 13. Opciones (menú)
 
-- Sensibilidad de giro de cabeza.
-- Zona neutral de cabeza.
-- Sensibilidad del volante del LRV.
-- Velocidad máxima de caminata (1.2 m/s por defecto).
-- Distancia por paso (0.4 m por defecto) y tiempo de aceleración hasta la velocidad máxima (0.5 s por defecto).
-- Método de señalar: cursor con el dedo índice (por defecto) o rayo desde el hombro.
-- Mano que señala (derecha por defecto), sensibilidad del cursor (1.0) y suavizado del cursor (0.3).
-- Tamaño de la mano (1.25 por defecto, rango 0.6–2.0): escala las longitudes; el grosor no cambia.
-- Ajuste de modelo de mano (casilla, apagada por defecto): la pose de la mano sale de ajustar un modelo articulado (24 parámetros, límites anatómicos de HAND_JOINT_LIMITS en `src/visual/manoModelo.ts`) a los landmarks, en vez de reconstruirla frame a frame.
-- Separación entre manos (0 m por defecto, rango 0–0.6 m, paso 0.01 m): separación total entre las dos manos del avatar. Cada mano se desplaza la mitad hacia su lado (solo en x). Se aplica en vivo y se guarda en localStorage.
-- Segundos sin ver la mano antes de que desaparezca (1 s) y salto máximo para deslizarse al reaparecer (0,05 m).
-- Topes de las articulaciones de la mano (grados, mín y máx por parámetro), con botón de restaurar.
-- Control: cámara (gestos) o teclado y ratón. Se elige en la pantalla de inicio y se guarda en localStorage (`museo-espacial:control:v1`). El botón “Cambiar control” vuelve a la pantalla de inicio. El mapeo de teclas está en spec-visual-museo.md, sección 9.1.
+El panel muestra solo lo que el jugador cambia. El resto de ajustes de `src/game/opciones.ts` (método de señalar, mano que señala, tamaño de la mano, ajuste de modelo de mano, topes de las articulaciones y similares) queda en su valor por defecto.
+
 - Idioma (español / inglés).
-- Subtítulos en la animación del LRV (activados por defecto; también con la tecla C durante la animación).
-- Recalibrar.
-- Modo de movilidad limitada (deshabilitado, “Próximamente”).
+- Volumen del sonido (0–100 %, 100 % por defecto): afecta a la voz del mentor y a las líneas grabadas. Se aplica en vivo: la frase que suena sigue desde la palabra en curso con el nuevo volumen, sin cambiar de voz; retoma en el carácter donde iba, sin repetir ni saltar palabras, con una pausa breve al cambiar (el reinicio va cada 300 ms como mucho). Si la voz del navegador ignora el volumen, no baja; algunas voces de red de Google lo hacen.
+- Control: cámara (gestos) o teclado y ratón. Se elige en la pantalla de inicio y se guarda en localStorage (`museo-espacial:control:v1`). El botón “Cambiar control” vuelve a la pantalla de inicio. El mapeo de teclas está en spec-visual-museo.md, sección 9.1.
+- Nombre del viajero, que Robi usa en sus frases. Se guarda en localStorage (`museo-espacial:viajero:v1`). Un nombre vacío no se guarda.
+- Sensibilidad, según el control elegido:
+  - Cámara: de la mano para señalar (`sensibilidadCursor`, 1.0), de la cabeza para girar (`sensibilidadGiro`, 0.6, rango 0.2–1.0) y de la caminata en metros por paso (`metrosPorPaso`, 0.4).
+  - Teclado y ratón: del ratón para mirar (`sensibilidadRaton`, 1.0) y velocidad máxima al caminar con W y S (`velocidadMax`, 1.2 m/s).
 
 ## 14. Estado de implementación
 

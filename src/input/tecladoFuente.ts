@@ -129,8 +129,9 @@ export class FuenteTeclado implements FuenteEntrada {
     lectura.volanteGrados = lado * VOLANTE_TECLADO_GRADOS;
 
     // Ratón: a la derecha gira a la derecha; hacia arriba mira arriba.
-    lectura.giroGrados = this.ratonX * SENSIBILIDAD_RATON_GRADOS_POR_PX;
-    lectura.cabeceoGrados = -this.ratonY * SENSIBILIDAD_RATON_GRADOS_POR_PX;
+    const grados = SENSIBILIDAD_RATON_GRADOS_POR_PX * this.opciones.sensibilidadRaton;
+    lectura.giroGrados = this.ratonX * grados;
+    lectura.cabeceoGrados = -this.ratonY * grados;
     this.ratonX = 0;
     this.ratonY = 0;
 

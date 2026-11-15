@@ -1,42 +1,39 @@
 import {
   guardarOpciones,
-  RANGOS,
+  LARGO_MAX_NOMBRE,
+  limpiarNombre,
   normalizarOpciones,
-  tablaLimitesPorDefecto,
+  RANGOS,
   type ModoControl,
   type Opciones,
 } from '../game/opciones';
-import type { TablaLimites } from '../visual/manoModelo';
 import { alCambiarIdioma, fijarIdioma, idioma, t, type ClaveTexto } from '../i18n';
 import { requireEl } from './dom';
 
-type Numerico =
-  | 'sensibilidadCursor'
-  | 'suavizadoCursor'
-  | 'metrosPorPaso'
-  | 'velocidadMax'
-  | 'tiempoAceleracion'
-  | 'sensibilidadGiro'
-  | 'tamanoMano'
-  | 'separacionManos'
-  | 'tiempoOcultarManoS'
-  | 'umbralSaltoManoM';
+/** Opciones que se ajustan con un deslizador. */
+type Deslizable = 'volumen' | 'sensibilidadCursor' | 'sensibilidadGiro' | 'metrosPorPaso' | 'sensibilidadRaton' | 'velocidadMax';
 
-const NUMERICOS: { clave: Numerico; etiqueta: ClaveTexto; paso: number }[] = [
-  { clave: 'sensibilidadCursor', etiqueta: 'opc_sensibilidad', paso: 0.1 },
-  { clave: 'suavizadoCursor', etiqueta: 'opc_suavizado', paso: 0.05 },
-  { clave: 'metrosPorPaso', etiqueta: 'opc_metros_paso', paso: 0.05 },
-  { clave: 'velocidadMax', etiqueta: 'opc_velocidad_max', paso: 0.1 },
-  { clave: 'tiempoAceleracion', etiqueta: 'opc_tiempo_aceleracion', paso: 0.05 },
+interface Deslizador {
+  clave: Deslizable;
+  etiqueta: ClaveTexto;
+  paso: number;
+}
+
+/** Sonido: se ajusta con cualquier control. */
+const SONIDO: Deslizador[] = [{ clave: 'volumen', etiqueta: 'opc_volumen', paso: 0.05 }];
+
+/** Sensibilidad con cámara: lo que mueve el cuerpo. */
+const SENSIBILIDAD_CAMARA: Deslizador[] = [
+  { clave: 'sensibilidadCursor', etiqueta: 'opc_sensibilidad_mano', paso: 0.1 },
   { clave: 'sensibilidadGiro', etiqueta: 'opc_sensibilidad_giro', paso: 0.05 },
-  { clave: 'tamanoMano', etiqueta: 'opc_tamano_mano', paso: 0.05 },
-  { clave: 'separacionManos', etiqueta: 'opc_separacion_manos', paso: 0.01 },
-  { clave: 'tiempoOcultarManoS', etiqueta: 'opc_tiempo_oculta_mano', paso: 0.1 },
-  { clave: 'umbralSaltoManoM', etiqueta: 'opc_umbral_salto_mano', paso: 0.01 },
+  { clave: 'metrosPorPaso', etiqueta: 'opc_sensibilidad_caminata', paso: 0.05 },
 ];
 
-/** Deslizadores: se muestran como `range` y aplican el cambio mientras se arrastran. */
-const DESLIZADORES: ReadonlySet<Numerico> = new Set<Numerico>(['tamanoMano', 'separacionManos']);
+/** Sensibilidad con teclado y ratón: el giro con el ratón y la velocidad con W y S. */
+const SENSIBILIDAD_TECLADO: Deslizador[] = [
+  { clave: 'sensibilidadRaton', etiqueta: 'opc_sensibilidad_raton', paso: 0.1 },
+  { clave: 'velocidadMax', etiqueta: 'opc_velocidad_max', paso: 0.1 },
+];
 
 /** Crea un elemento con atributos y hijos (sin innerHTML). */
 function crear<K extends keyof HTMLElementTagNameMap>(
@@ -50,10 +47,14 @@ function crear<K extends keyof HTMLElementTagNameMap>(
   return el;
 }
 
-/** Control actual y qué hacer al pulsar "Cambiar control". */
+/** Control actual, nombre del viajero y qué hacer al cambiar cada uno. */
 export interface ControlOpciones {
   modo: ModoControl;
+  nombre: string;
+  /** Pulsar "Cambiar control". */
   onCambiar: () => void;
+  /** Recibe el nombre ya limpio y nunca vacío. */
+  onNombre: (nombre: string) => void;
 }
 
 export interface OpcionesUi {
@@ -65,8 +66,8 @@ export interface OpcionesUi {
 }
 
 /**
- * Panel de opciones (SPEC 13). Los cambios se aplican al momento y se guardan.
- * `onCambio` recibe siempre valores ya ajustados a su rango.
+ * Panel de opciones (SPEC 13): idioma, volumen, control, nombre y la sensibilidad del control elegido. Los cambios
+ * se aplican al momento y se guardan. `onCambio` recibe siempre valores ya ajustados a su rango.
  */
 export function crearOpcionesUi(actuales: Opciones, onCambio: (nuevas: Opciones) => void, control: ControlOpciones): OpcionesUi {
   const boton = requireEl<HTMLButtonElement>('opcionesBoton');
@@ -75,6 +76,11 @@ export function crearOpcionesUi(actuales: Opciones, onCambio: (nuevas: Opciones)
 
   const oyentes: ((abierto: boolean) => void)[] = [];
   const estaAbierto = (): boolean => !panel.hidden;
+
+  let ultimas = actuales;
+  /** Nombre del viajero: no es una opción, pero se cambia en este mismo panel. */
+  let nombre = control.nombre;
+
   const ponerVisible = (visible: boolean): void => {
     if (estaAbierto() === visible) return;
     // Al abrir, el panel se rehace con los valores actuales: algunos cambian fuera de él (la tecla C de los subtítulos).
@@ -87,27 +93,7 @@ export function crearOpcionesUi(actuales: Opciones, onCambio: (nuevas: Opciones)
   };
   boton.addEventListener('click', () => ponerVisible(!estaAbierto()));
 
-  let ultimas = actuales;
-
   const montar = (): void => {
-    const selectMetodo = crear('select', { id: 'opcMetodo' }, [
-      crear('option', { value: 'cursor' }, [t('opc_metodo_cursor')]),
-      crear('option', { value: 'rayo' }, [t('opc_metodo_rayo')]),
-    ]);
-    const checkAjuste = crear('input', { type: 'checkbox', id: 'opcAjusteMano' });
-    const checkSubtitulos = crear('input', { type: 'checkbox', id: 'opcSubtitulosLRV' });
-    const selectMano = crear('select', { id: 'opcMano' }, [
-      crear('option', { value: 'Right' }, [t('opc_mano_derecha')]),
-      crear('option', { value: 'Left' }, [t('opc_mano_izquierda')]),
-    ]);
-    const inputs = new Map<Numerico, HTMLInputElement>();
-    const valores = new Map<Numerico, HTMLSpanElement>();
-
-    // Control (cámara o teclado): se cambia en la pantalla de inicio.
-    const nombreControl = t(control.modo === 'teclado' ? 'inicio_control_teclado' : 'inicio_control_camara');
-    const cambiarControl = crear('button', { type: 'button', class: 'opciones-control' }, [t('opc_cambiar_control')]);
-    cambiarControl.addEventListener('click', control.onCambiar);
-
     // Idioma: cambia en vivo, sin recargar. Los nombres de idioma no se traducen.
     const selectIdioma = crear('select', { id: 'opcIdioma' }, [
       crear('option', { value: 'es' }, ['Español']),
@@ -116,108 +102,64 @@ export function crearOpcionesUi(actuales: Opciones, onCambio: (nuevas: Opciones)
     selectIdioma.value = idioma();
     selectIdioma.addEventListener('change', () => fijarIdioma(selectIdioma.value === 'en' ? 'en' : 'es'));
 
+    // Control (cámara o teclado): se cambia en la pantalla de inicio.
+    const nombreControl = t(control.modo === 'teclado' ? 'inicio_control_teclado' : 'inicio_control_camara');
+    const cambiarControl = crear('button', { type: 'button', class: 'opciones-control' }, [t('opc_cambiar_control')]);
+    cambiarControl.addEventListener('click', control.onCambiar);
+
+    // Nombre: se guarda al confirmar. Un nombre vacío no vale: vuelve el anterior.
+    const campoNombre = crear('input', { type: 'text', id: 'opcNombre', maxlength: String(LARGO_MAX_NOMBRE), autocomplete: 'off' });
+    campoNombre.value = nombre;
+    campoNombre.addEventListener('change', () => {
+      const limpio = limpiarNombre(campoNombre.value);
+      if (limpio !== '') {
+        nombre = limpio;
+        control.onNombre(limpio);
+      }
+      campoNombre.value = nombre;
+    });
+
+    // Deslizadores: aplican el cambio mientras se arrastran.
+    const inputs = new Map<Deslizable, HTMLInputElement>();
+    const valores = new Map<Deslizable, HTMLSpanElement>();
+    const deslizador = ({ clave, etiqueta, paso }: Deslizador): HTMLLabelElement => {
+      const [min, max] = RANGOS[clave];
+      const input = crear('input', { type: 'range', min: String(min), max: String(max), step: String(paso) });
+      const valor = crear('span', { class: 'opciones-valor' });
+      inputs.set(clave, input);
+      valores.set(clave, valor);
+      input.addEventListener('input', () => aplicar());
+      return crear('label', {}, [t(etiqueta), crear('div', { class: 'opciones-deslizador' }, [input, valor])]);
+    };
+
+    const sensibilidad = control.modo === 'teclado' ? SENSIBILIDAD_TECLADO : SENSIBILIDAD_CAMARA;
     const campos: Node[] = [
       crear('label', {}, [t('opc_idioma'), selectIdioma]),
+      ...SONIDO.map(deslizador),
       crear('div', { class: 'opciones-fila' }, [crear('span', {}, [t('opc_control', { modo: nombreControl })]), cambiarControl]),
-      crear('label', {}, [t('opc_metodo'), selectMetodo]),
-      crear('label', {}, [t('opc_mano'), selectMano]),
+      crear('label', {}, [t('opc_nombre'), campoNombre]),
+      crear('h2', { class: 'opciones-grupo' }, [t('opc_sensibilidad_titulo')]),
+      ...sensibilidad.map(deslizador),
     ];
-    for (const { clave, etiqueta, paso } of NUMERICOS) {
-      const [min, max] = RANGOS[clave];
-      const esDeslizador = DESLIZADORES.has(clave);
-      const input = crear('input', {
-        type: esDeslizador ? 'range' : 'number',
-        min: String(min),
-        max: String(max),
-        step: String(paso),
-      });
-      inputs.set(clave, input);
-      if (esDeslizador) {
-        const valor = crear('span', {}, []);
-        valores.set(clave, valor);
-        campos.push(crear('label', {}, [t(etiqueta), input, valor]));
-      } else {
-        campos.push(crear('label', {}, [t(etiqueta), input]));
-      }
-    }
-
-    campos.push(crear('label', {}, [checkAjuste, t('opc_ajuste_mano')]));
-    campos.push(crear('label', {}, [checkSubtitulos, t('opc_subtitulos_lrv')]));
-
-    // Topes de las articulaciones de la mano (grados): mínimo y máximo por parámetro. Se aplican al momento.
-    const limInputs = new Map<string, [HTMLInputElement, HTMLInputElement]>();
-    const filasLim: Node[] = [];
-    for (const [articulacion, params] of Object.entries(tablaLimitesPorDefecto())) {
-      for (const nombre of Object.keys(params)) {
-        const clave = `lim_${articulacion}_${nombre}` as ClaveTexto;
-        const min = crear('input', { type: 'number', min: '-180', max: '180', step: '1', 'aria-label': t('opc_limites_min') });
-        const max = crear('input', { type: 'number', min: '-180', max: '180', step: '1', 'aria-label': t('opc_limites_max') });
-        min.addEventListener('change', () => aplicar());
-        max.addEventListener('change', () => aplicar());
-        limInputs.set(`${articulacion}.${nombre}`, [min, max]);
-        filasLim.push(crear('div', { class: 'lim-fila' }, [crear('span', {}, [t(clave)]), min, max]));
-      }
-    }
-    const restaurarLim = crear('button', { type: 'button' }, [t('opc_limites_restaurar')]);
-    restaurarLim.addEventListener('click', () => {
-      const defecto = tablaLimitesPorDefecto();
-      for (const [clave, [min, max]] of limInputs) {
-        const [art, par] = clave.split('.');
-        const v = defecto[art]?.[par];
-        if (v) {
-          min.value = String(v[0]);
-          max.value = String(v[1]);
-        }
-      }
-      aplicar();
-    });
-    campos.push(crear('details', {}, [crear('summary', {}, [t('opc_limites_titulo')]), ...filasLim, restaurarLim]));
 
     const cerrar = crear('button', { type: 'button' }, [t('opciones_cerrar')]);
     panel.replaceChildren(crear('h1', {}, [t('opciones_titulo')]), crear('div', { class: 'opciones-caja' }, [...campos, cerrar]));
 
     const mostrar = (o: Opciones): void => {
-      selectMetodo.value = o.metodoSenalar;
-      selectMano.value = o.manoSenaladora;
-      checkAjuste.checked = o.ajusteManoModelo;
-      checkSubtitulos.checked = o.subtitulosPresentacion;
-      for (const { clave } of NUMERICOS) {
-        const input = inputs.get(clave);
-        if (input) input.value = String(o[clave]);
+      for (const [clave, input] of inputs) {
+        input.value = String(o[clave]);
+        // Se lee de vuelta: el navegador ajusta el valor al paso del deslizador.
         const valor = valores.get(clave);
-        if (valor) valor.textContent = String(o[clave]);
-      }
-      for (const [clave, [min, max]] of limInputs) {
-        const [art, par] = clave.split('.');
-        const v = o.limitesMano[art]?.[par];
-        if (v) {
-          min.value = String(v[0]);
-          max.value = String(v[1]);
-        }
+        if (valor) valor.textContent = formatear(clave, Number(input.value));
       }
     };
 
-    const leerLimites = (): TablaLimites => {
-      const tabla: TablaLimites = {};
-      for (const [clave, [min, max]] of limInputs) {
-        const [art, par] = clave.split('.');
-        tabla[art] ??= {};
-        const a = min.value === '' ? NaN : Number(min.value);
-        const b = max.value === '' ? NaN : Number(max.value);
-        tabla[art][par] = [a, b];
-      }
-      return tabla;
+    const leer = (): Opciones => {
+      // Solo cambian los deslizadores de este control; el resto de opciones conserva su valor guardado.
+      const cambios: Partial<Record<Deslizable, number>> = {};
+      for (const [clave, input] of inputs) cambios[clave] = Number(input.value);
+      return normalizarOpciones({ ...ultimas, ...cambios });
     };
-
-    const leer = (): Opciones =>
-      normalizarOpciones({
-        metodoSenalar: selectMetodo.value,
-        manoSenaladora: selectMano.value,
-        ajusteManoModelo: checkAjuste.checked,
-        subtitulosPresentacion: checkSubtitulos.checked,
-        limitesMano: leerLimites(),
-        ...Object.fromEntries(NUMERICOS.map(({ clave }) => [clave, Number(inputs.get(clave)?.value)])),
-      });
 
     const aplicar = (): void => {
       const nuevas = leer();
@@ -226,15 +168,6 @@ export function crearOpcionesUi(actuales: Opciones, onCambio: (nuevas: Opciones)
       mostrar(nuevas);
       onCambio(nuevas);
     };
-
-    selectMetodo.addEventListener('change', aplicar);
-    selectMano.addEventListener('change', aplicar);
-    checkAjuste.addEventListener('change', aplicar);
-    checkSubtitulos.addEventListener('change', aplicar);
-    for (const [clave, input] of inputs) {
-      // Los deslizadores aplican en vivo mientras se arrastran; los campos numéricos al confirmar.
-      input.addEventListener(DESLIZADORES.has(clave) ? 'input' : 'change', aplicar);
-    }
 
     cerrar.addEventListener('click', () => ponerVisible(false));
     mostrar(ultimas);
@@ -252,4 +185,9 @@ export function crearOpcionesUi(actuales: Opciones, onCambio: (nuevas: Opciones)
     abierto: estaAbierto,
     onVisibilidad: (oyente) => oyentes.push(oyente),
   };
+}
+
+/** Texto del valor de un deslizador: el volumen en porcentaje, el resto con dos decimales. */
+function formatear(clave: Deslizable, v: number): string {
+  return clave === 'volumen' ? `${Math.round(v * 100)}%` : v.toFixed(2);
 }

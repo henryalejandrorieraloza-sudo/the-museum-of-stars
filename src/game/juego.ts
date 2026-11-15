@@ -22,7 +22,15 @@ import { crearUi, type JuegoUi } from '../ui/juegoUi';
 import { FuenteCamara } from '../input/camaraFuente';
 import { FuenteTeclado } from '../input/tecladoFuente';
 import { enCampoDeTexto, type FuenteEntrada, type LecturaEntrada, type Senal } from '../input/fuente';
-import { cargarControl, cargarOpciones, guardarControl, guardarOpciones, type ModoControl, type Opciones } from './opciones';
+import {
+  cargarControl,
+  cargarOpciones,
+  guardarControl,
+  guardarNombre,
+  guardarOpciones,
+  type ModoControl,
+  type Opciones,
+} from './opciones';
 import { Museo, type EventoMuseo } from './museo';
 import { MisionLuna, metrosAPieLuna, type EntradaLuna, type EstadoLuna } from './luna';
 import { avanzarAnilloMantener, DespliegueLRV } from './despliegueLRV';
@@ -323,6 +331,7 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
   const video = requireEl<HTMLVideoElement>('camara');
   // Opciones (SPEC 13): el panel modifica este mismo objeto al cambiar un valor.
   const opciones = cargarOpciones();
+  voz.fijarVolumen(opciones.volumen);
 
   museo.onEvento((evento: EventoMuseo) => {
     switch (evento.tipo) {
@@ -495,14 +504,27 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
   // El anillo de mantener lleva la E con teclado y un puño cerrado con la cámara.
   anillo.fijarSimbolo(modo === 'teclado' ? 'tecla' : 'puno');
 
-  const opcionesUi = crearOpcionesUi(opciones, (nuevas) => Object.assign(opciones, nuevas), {
-    modo,
-    // Cambiar control: se guarda el otro modo y se vuelve a la pantalla de inicio con él marcado.
-    onCambiar: () => {
-      guardarControl(modo === 'teclado' ? 'camara' : 'teclado');
-      location.reload();
+  const opcionesUi = crearOpcionesUi(
+    opciones,
+    (nuevas) => {
+      Object.assign(opciones, nuevas);
+      voz.fijarVolumen(nuevas.volumen);
     },
-  });
+    {
+      modo,
+      nombre: nombreViajero,
+      // Cambiar control: se guarda el otro modo y se vuelve a la pantalla de inicio con él marcado.
+      onCambiar: () => {
+        guardarControl(modo === 'teclado' ? 'camara' : 'teclado');
+        location.reload();
+      },
+      // El mentor usa el nombre en sus próximas frases (variablesTexto).
+      onNombre: (nombre) => {
+        nombreViajero = nombre;
+        guardarNombre(nombre);
+      },
+    },
+  );
   // En modo teclado no se pide la cámara ni se carga MediaPipe, y las manos 3D no se muestran.
   const fuente: FuenteEntrada = camara ?? new FuenteTeclado(container, opciones, opcionesUi);
   fuenteActiva = fuente;
