@@ -13,6 +13,8 @@ import { alCambiarIdioma, idioma, LENGUA_VOZ, t, tGuion, type ClaveTexto } from 
 import { requireEl } from '../ui/dom';
 import { crearCursor, type CursorUi } from '../ui/cursor';
 import { crearInicioUi } from '../ui/inicioUi';
+import { crearModosUi, type ModoApp } from '../ui/modosUi';
+import { crearTallerUi } from '../ui/tallerUi';
 import { crearOpcionesUi } from '../ui/opcionesUi';
 import { crearUi, type JuegoUi } from '../ui/juegoUi';
 import { FuenteCamara } from '../input/camaraFuente';
@@ -90,6 +92,19 @@ let ultimaCinematicaS: number | null = null;
  */
 let reanudarCinematicaS: number | null = null;
 
+/**
+ * Modo elegido en la pantalla de modos (ui/modosUi.ts, que se abre al aplaudir tras la explicación del holograma del LRV) y
+ * todavía en curso, o null. Con 'libre', la Luna es solo el moon buggy (sin misión ni módulo lunar); al salir, el museo.
+ */
+let modoApp: ModoApp | null = null;
+
+/** Qué dice Robi al explorar cada cuadrante de la pantalla de modos. */
+const FRASE_MODO: Record<ModoApp, ClaveTexto> = {
+  historia: 'modos_robi_historia',
+  taller: 'modos_robi_taller',
+  libre: 'modos_robi_libre',
+};
+
 /** Control con el que se juega. Decide qué textos de ayuda se muestran (gesto o tecla). */
 let modoControl: ModoControl = 'camara';
 
@@ -132,6 +147,8 @@ const TEXTO_TECLADO: Partial<Record<ClaveTexto, ClaveTexto>> = {
   luna_LRV_plegado: 'luna_LRV_plegado_teclado',
   luna_suelo_manten: 'luna_suelo_manten_teclado',
   luna_sentado_en_LRV: 'luna_sentado_en_LRV_teclado',
+  modos_robi_libre: 'modos_robi_libre_teclado',
+  libre_bienvenida: 'libre_bienvenida_teclado',
 };
 
 /** Nombre que el viajero escribió en la pantalla de inicio. Vacío = se usa "explorador" en el idioma activo. */
@@ -285,6 +302,8 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
   const cursorUi = crearCursor();
   const anillo = crearAnillo();
   const inicio = crearInicioUi();
+  const modos = crearModosUi();
+  const tallerUi = crearTallerUi();
   const video = requireEl<HTMLVideoElement>('camara');
   // Opciones (SPEC 13): el panel modifica este mismo objeto al cambiar un valor.
   const opciones = cargarOpciones();
@@ -304,6 +323,10 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
         voz.cancelar();
         habla = null;
         ui.subtitulos(null);
+        break;
+      case 'elegirModo':
+        // Tras la explicación del holograma del LRV y el aplauso (o espacio): historia, taller 3D o exploración libre.
+        void mostrarModos();
         break;
       case 'presentacionAbierta':
         // La animación del LRV entre la vitrina y la misión (game/presentacionLRV.ts). Sin entradas del museo; Enter
@@ -332,7 +355,25 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
         voz.cancelar();
         habla = null;
         ui.subtitulos(null);
-        if (evento.mision === 'luna') {
+        if (evento.mision === 'luna' && modoApp === 'libre') {
+          // Exploración libre: solo el moon buggy en la Luna. El jugador ya va sentado, con el LRV desplegado, y no hay
+          // misión, roca ni suelo naranja: se conduce, se baja y se sube cuando se quiere.
+          mision = new MisionLuna('sentado_en_LRV', undefined, undefined, true);
+          despliegue = new DespliegueLRV('desplegado');
+          visual.museo.poseDespliegueLRV(DURACION_DESPLIEGUE_LRV_S, 0);
+          ultimoDespliegueS = null;
+          sueloNaranja = null;
+          visual.museo.recogerSueloNaranja(0);
+          volverAnillo = 0;
+          volverArmado = false;
+          volverPedido = false;
+          listoPendiente = false;
+          instruccionDesplegarDicha = true;
+          subidaLista = true;
+          conduccionLista = true;
+          cursorUi.mostrar(false);
+          decirFrase(voz, ui, 'libre_bienvenida');
+        } else if (evento.mision === 'luna') {
           // Misión lunar (SPEC 8): sin cartel de "en construcción". El primer aplauso dentro sienta al jugador.
           mision = new MisionLuna();
           // Al reanudar la cinemática del despegue tras recargar, la misión ya está cumplida.
@@ -382,6 +423,9 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
         claveMision = null;
         // Si el mentor aún habla de la misión, termina esa frase y luego da la conclusión.
         colaFrases.length = 0;
+        // Si se salía de la exploración libre, la Luna vuelve a ser la de la misión.
+        if (modoApp === 'libre') visual.museo.fijarLunaLibre(false);
+        modoApp = null;
         decirFrase(voz, ui, 'regreso_museo', undefined, true);
         break;
     }
@@ -463,6 +507,74 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
   alCambiarIdioma(() => releerTextos(sesion));
   let avisoActual: string | null | undefined;
   const balanceo = new BalanceoCaminata();
+
+  // --- Pantalla de modos y taller 3D ---------------------------------------------------------------------------
+  let modoExplicado: ModoApp | null = null;
+  modos.alExplorar((modo) => {
+    // Robi explica el cuadrante; si ya está contando ese mismo, no se repite.
+    if (modo === modoExplicado && mentorHablando) return;
+    modoExplicado = modo;
+    colaFrases.length = 0;
+    voz.cancelar();
+    hablar(voz, ui, FRASE_MODO[modo]);
+  });
+
+  /** Pantalla de modos: Robi invita a elegir y, según el cuadrante elegido, empieza ese modo. */
+  mostrarModos = async (): Promise<void> => {
+    modoExplicado = null;
+    requireEl('ayuda').hidden = true;
+    pausarEntrada('menu', true);
+    colaFrases.length = 0;
+    voz.cancelar();
+    habla = null;
+    ui.subtitulos(null);
+    const elegido = modos.elegir();
+    hablar(voz, ui, 'modos_robi_intro');
+    const modo = await elegido;
+    pausarEntrada('menu', false);
+    colaFrases.length = 0;
+    voz.cancelar();
+    habla = null;
+    ui.subtitulos(null);
+    requireEl('ayuda').hidden = false;
+    if (modo === 'volver') {
+      museo.cancelarModos();
+    } else if (modo === 'taller') {
+      abrirTaller();
+    } else if (modo === 'libre') {
+      modoApp = 'libre';
+      visual.museo.fijarLunaLibre(true);
+      museo.iniciarLibre();
+    } else {
+      modoApp = 'historia';
+      visual.museo.fijarLunaLibre(false);
+      museo.iniciarHistoria();
+    }
+  };
+
+  function abrirTaller(): void {
+    const tv = visual.museo.entrarTaller();
+    if (!tv) {
+      ui.aviso(t('taller_error'));
+      window.setTimeout(() => ui.aviso(null), 4000);
+      void mostrarModos();
+      return;
+    }
+    modoApp = 'taller';
+    pausarEntrada('taller', true);
+    requireEl('ayuda').hidden = true;
+    cursorUi.mostrar(false);
+    anillo.mostrar(null);
+    tallerUi.abrir(tv);
+  }
+
+  tallerUi.alSalir(() => {
+    tallerUi.cerrar();
+    visual.museo.salirTaller();
+    pausarEntrada('taller', false);
+    modoApp = null;
+    void mostrarModos();
+  });
   window.addEventListener('keydown', (ev) => {
     if (ev.code !== 'Digit7' || ev.repeat || enCampoDeTexto(ev.target)) return;
     pausaTotal = !pausaTotal;
@@ -508,7 +620,10 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
 
   // ¿Se recargó la página con la cinemática del despegue a medias? Entonces se vuelve directo a la Luna a terminarla.
   reanudarCinematicaS = cargarProgresoDespegue();
-  if (reanudarCinematicaS !== null) museo.abrirMisionDirecta('luna');
+  if (reanudarCinematicaS !== null) {
+    modoApp = 'historia';
+    museo.abrirMisionDirecta('luna');
+  }
 }
 
 /** Estado que persiste entre fotogramas. */
@@ -565,12 +680,15 @@ function iniciarCinematica(sesion: Sesion, desdeS: number): void {
   visual.museo.actualizarDespegue(c.estado);
 }
 
+/** Muestra la pantalla de modos (se define dentro de iniciarJuego, donde está la sesión). */
+let mostrarModos: () => Promise<void> = async () => {};
+
 /** Fuente de entrada, cuando ya exista (se elige después de montar los eventos). */
 let fuenteActiva: FuenteEntrada | null = null;
-/** Motivos por los que la entrada está pausada: opciones, cinemática y pausa total (tecla 7). */
+/** Motivos por los que la entrada está pausada: opciones, cinemática, pausa total (tecla 7), pantalla de modos y taller. */
 const motivosPausaEntrada = new Set<string>();
 /** Pausa o reanuda la entrada según los motivos activos; sin ninguno, vuelve a contar gestos y teclas. */
-function pausarEntrada(motivo: 'opciones' | 'cinematica' | 'total', activo: boolean): void {
+function pausarEntrada(motivo: 'opciones' | 'cinematica' | 'total' | 'menu' | 'taller', activo: boolean): void {
   if (activo) motivosPausaEntrada.add(motivo);
   else motivosPausaEntrada.delete(motivo);
   fuenteActiva?.pausar(motivosPausaEntrada.size > 0);

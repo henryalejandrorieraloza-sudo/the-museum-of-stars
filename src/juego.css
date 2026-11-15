@@ -906,3 +906,811 @@
     bottom: 24px;
   }
 }
+
+/* ------------------------------------------------------------------------------------------------------------------
+   Pantalla de modos (src/ui/modosUi.ts), al aplaudir tras la explicación del holograma del LRV. Estética low poly del juego:
+   paleta del museo (púrpura, ámbar, cian y lila), esquinas cortadas como los marcos de las vitrinas, facetas planas y
+   sombras duras sin desenfoque. De fondo, un moon buggy recorre la Luna a lo lejos (src/ui/fondoLunar.ts). Va por debajo de
+   los subtítulos (z-index 3) para que se lea lo que dice Robi.
+   ------------------------------------------------------------------------------------------------------------------ */
+.modos {
+  --m-ambar: #ffa63d;
+  --m-ambar-claro: #ffd08a;
+  --m-ambar-oscuro: #c46f3c;
+  --m-cian: #3fe9ff;
+  --m-cian-claro: #b8f6ff;
+  --m-cian-oscuro: #1e9fb5;
+  --m-lila: #9271dc;
+  --m-lila-claro: #d3c3ff;
+  --m-lila-oscuro: #5c2484;
+  --m-noche: #140a26;
+  z-index: 2;
+  background: #05030f;
+}
+
+.modos-fondo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.modos-marco {
+  position: relative;
+  display: grid;
+  gap: 18px;
+  width: min(980px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 18px 14px 22px;
+  animation: inicio-entrar 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.modos-cabecera {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+/* Etiqueta del moon buggy sobre el título, con las esquinas cortadas. */
+.modos-insignia {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 22px 7px 14px;
+  background: var(--m-ambar);
+  color: var(--m-noche);
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  font: 800 13px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.modos-insignia i {
+  font-style: normal;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.modos-insignia-icono svg {
+  display: block;
+  width: 26px;
+  height: 26px;
+}
+
+.modos-insignia .t1 { fill: var(--m-noche); }
+.modos-insignia .t2 { fill: #5c2484; }
+.modos-insignia .t3 { fill: #7a3e1c; }
+.modos-insignia .t4 { fill: #fff3d6; }
+
+.modos-titulo {
+  margin: 0;
+  color: #fff;
+  font: 800 clamp(30px, 5.2vw, 54px) / 1.05 'Avenir Next', 'Avenir', 'Segoe UI', system-ui, sans-serif;
+  letter-spacing: -0.01em;
+  text-align: center;
+  /* Sombra dura, sin desenfoque: como un bloque extruido. */
+  text-shadow: 3px 3px 0 var(--m-lila-oscuro), 6px 6px 0 rgba(20, 10, 38, 0.85);
+}
+
+/* Tres cuadrantes: dos arriba y uno abajo en el centro. Sus centros forman un triángulo, que se dibuja detrás. */
+.modos-rejilla {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 20px;
+  height: min(50vh, 430px);
+  min-height: 330px;
+}
+
+.modos-celda--libre {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  justify-self: center;
+  width: calc(50% - 10px);
+}
+
+.modos-triangulo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.modos-triangulo polygon {
+  fill: rgba(63, 233, 255, 0.05);
+  stroke: var(--m-cian);
+  stroke-width: 1.5px;
+  stroke-dasharray: 7 7;
+  stroke-opacity: 0.55;
+  vector-effect: non-scaling-stroke;
+}
+
+.modos-triangulo circle {
+  fill: var(--m-cian);
+}
+
+.modos-celda {
+  --acento: var(--m-ambar);
+  --acento-claro: var(--m-ambar-claro);
+  --acento-oscuro: var(--m-ambar-oscuro);
+  --corte: 24px;
+  position: relative;
+  min-height: 0;
+  /* Sombra dura debajo del cuadrante (el recorte de esquinas no la corta porque va en el contenedor). */
+  filter: drop-shadow(0 9px 0 rgba(5, 3, 15, 0.75));
+  transition: transform 0.18s ease;
+}
+
+.modos-celda--taller {
+  --acento: var(--m-cian);
+  --acento-claro: var(--m-cian-claro);
+  --acento-oscuro: var(--m-cian-oscuro);
+}
+
+.modos-celda--libre {
+  --acento: var(--m-lila);
+  --acento-claro: var(--m-lila-claro);
+  --acento-oscuro: var(--m-lila-oscuro);
+}
+
+.modos-celda:hover,
+.modos-celda:focus-within {
+  transform: translateY(-5px);
+}
+
+.modos-cuadro {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding: 18px 26px;
+  border: 0;
+  /* El fondo hace de borde: el relleno va en ::before, 3 px más pequeño. */
+  background: var(--acento);
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  clip-path: polygon(var(--corte) 0, calc(100% - var(--corte)) 0, 100% var(--corte), 100% calc(100% - var(--corte)), calc(100% - var(--corte)) 100%, var(--corte) 100%, 0 calc(100% - var(--corte)), 0 var(--corte));
+  outline: none;
+}
+
+.modos-cuadro::before,
+.modos-cuadro::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  clip-path: polygon(calc(var(--corte) - 2px) 0, calc(100% - var(--corte) + 2px) 0, 100% calc(var(--corte) - 2px), 100% calc(100% - var(--corte) + 2px), calc(100% - var(--corte) + 2px) 100%, calc(var(--corte) - 2px) 100%, 0 calc(100% - var(--corte) + 2px), 0 calc(var(--corte) - 2px));
+  pointer-events: none;
+}
+
+/* Relleno de facetas planas: triángulos de luz y de sombra sobre un degradado de violeta a noche. */
+.modos-cuadro::before {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0 24%, transparent 24%),
+    linear-gradient(-45deg, rgba(0, 0, 0, 0.3) 0 26%, transparent 26%),
+    linear-gradient(62deg, transparent 0 62%, rgba(255, 255, 255, 0.04) 62% 100%),
+    linear-gradient(160deg, #35207a 0%, #1f1048 55%, #140a26 100%);
+}
+
+/* Faceta de color del cuadrante: un triángulo en la esquina de arriba a la izquierda. */
+.modos-cuadro::after {
+  background: var(--acento);
+  opacity: 0.14;
+  clip-path: polygon(0 0, 62% 0, 0 70%);
+  transition: opacity 0.18s ease;
+}
+
+.modos-cuadro:hover,
+.modos-cuadro:focus-visible {
+  background: var(--acento-claro);
+}
+
+.modos-cuadro:hover::after,
+.modos-cuadro:focus-visible::after {
+  opacity: 0.32;
+}
+
+.modos-cuadro > * {
+  position: relative;
+  z-index: 1;
+}
+
+.modos-icono svg {
+  display: block;
+  width: 66px;
+  height: 66px;
+}
+
+.modos-celda .t1 { fill: var(--acento); }
+.modos-celda .t2 { fill: var(--acento-oscuro); }
+.modos-celda .t3 { fill: var(--acento-claro); }
+.modos-celda .t4 { fill: #140a26; }
+
+.modos-nombre {
+  font-size: clamp(20px, 2.4vw, 26px);
+  font-weight: 800;
+  letter-spacing: -0.005em;
+  line-height: 1.1;
+}
+
+.modos-desc {
+  max-width: 32ch;
+  color: #d5ccf0;
+  font-size: clamp(13px, 1.4vw, 15px);
+  line-height: 1.4;
+}
+
+.modos-tecla {
+  position: absolute;
+  top: 16px;
+  right: 34px;
+  padding: 1px 8px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--acento-claro);
+  font: 800 12px ui-monospace, 'SF Mono', Menlo, monospace;
+  clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+}
+
+.modos-pista {
+  margin: 4px 0 0;
+  color: #b9afe0;
+  font: 600 11.5px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-shadow: 2px 2px 0 rgba(5, 3, 15, 0.9);
+}
+
+.modos-volver {
+  justify-self: center;
+  padding: 9px 22px;
+  border: 0;
+  background: #35207a;
+  color: #fff;
+  font: 700 12px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+}
+
+.modos-volver:hover,
+.modos-volver:focus-visible {
+  background: var(--m-ambar);
+  color: var(--m-noche);
+  outline: none;
+}
+
+@media (max-width: 700px) {
+  .modos-rejilla {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    height: auto;
+  }
+  .modos-celda,
+  .modos-celda--libre {
+    grid-column: auto;
+    grid-row: auto;
+    width: auto;
+    justify-self: stretch;
+    min-height: 150px;
+  }
+  .modos-triangulo {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------------------------------
+   Taller 3D del LRV (src/ui/tallerUi.ts). Paneles claros sobre el fondo blanco de la escena, con acento naranja y
+   etiquetas en mayúsculas pequeñas, como en las referencias. La escena se dibuja debajo; solo los paneles reciben el ratón.
+   ------------------------------------------------------------------------------------------------------------------ */
+.taller {
+  --t-papel: rgba(255, 255, 255, 0.78);
+  --t-borde: #e0ddd4;
+  --t-texto: #1c1a17;
+  --t-tenue: #8b867b;
+  --t-naranja: #f26a21;
+  --t-cian: #0fb8d6;
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  color: var(--t-texto);
+  font-family: 'Avenir Next', 'Avenir', 'Segoe UI', system-ui, sans-serif;
+  pointer-events: none;
+}
+
+.taller > * {
+  pointer-events: auto;
+}
+
+.taller-cabecera {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-right: 250px;
+  pointer-events: none;
+}
+
+.taller-cabecera > * {
+  pointer-events: auto;
+}
+
+.taller-marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 66px;
+  padding: 0 22px;
+  background: var(--t-naranja);
+  color: #fff;
+  border-radius: 0 0 14px 0;
+  font: 700 14px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.08em;
+}
+
+.taller-marca svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.taller-titulo h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.taller-titulo h1 em {
+  color: var(--t-naranja);
+  font-style: normal;
+}
+
+.taller-titulo p {
+  margin: 2px 0 0;
+  color: var(--t-tenue);
+  font: 500 10.5px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.taller-estado {
+  display: flex;
+  gap: 22px;
+  margin-left: auto;
+  font: 500 10.5px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t-tenue);
+}
+
+.taller-estado span {
+  display: grid;
+  gap: 2px;
+}
+
+.taller-estado b {
+  color: var(--t-texto);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+.taller[data-estado='desarmado'] .taller-estado span:first-child b,
+.taller[data-estado='desarmando'] .taller-estado span:first-child b {
+  color: var(--t-naranja);
+}
+
+.taller-menu {
+  padding: 8px 12px;
+  border: 1px solid var(--t-borde);
+  border-radius: 10px;
+  background: var(--t-papel);
+  color: var(--t-texto);
+  font: 600 11px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.taller-menu:hover {
+  border-color: var(--t-naranja);
+  color: var(--t-naranja);
+}
+
+.taller-columna {
+  position: absolute;
+  top: 84px;
+  bottom: 118px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 248px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  pointer-events: none;
+}
+
+.taller-columna > * {
+  pointer-events: auto;
+}
+
+.taller-columna--izq {
+  left: 16px;
+}
+
+.taller-columna--der {
+  right: 16px;
+  width: 290px;
+}
+
+.taller-panel,
+.taller-pieza,
+.taller-registro {
+  padding: 12px 14px 14px;
+  border: 1px solid var(--t-borde);
+  border-radius: 14px;
+  background: var(--t-papel);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 24px rgba(60, 50, 30, 0.06);
+}
+
+.taller-panel > header,
+.taller-registro > header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: var(--t-tenue);
+  font: 600 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.taller-panel > header span::before,
+.taller-registro > header span::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 10px;
+  margin-right: 7px;
+  vertical-align: -1px;
+  background: var(--t-naranja);
+}
+
+.taller-panel > header i,
+.taller-registro > header i {
+  font-style: normal;
+  opacity: 0.6;
+}
+
+.taller-datos {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px 10px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.taller-datos dt {
+  color: var(--t-tenue);
+}
+
+.taller-datos dd {
+  margin: 0;
+  font: 600 13px ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.taller-fuente {
+  margin: 10px 0 0;
+  color: var(--t-tenue);
+  font: 500 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.06em;
+}
+
+.taller-lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 2px;
+}
+
+.taller-lista li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.taller-lista li:first-child {
+  grid-template-columns: 1fr auto;
+}
+
+.taller-lista li i {
+  color: var(--t-tenue);
+  font: 500 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  font-style: normal;
+}
+
+.taller-lista li b {
+  color: var(--t-tenue);
+  font: 600 11px ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.taller-lista li:hover {
+  background: rgba(242, 106, 33, 0.08);
+}
+
+.taller-lista li.activa {
+  background: var(--t-naranja);
+  color: #fff;
+}
+
+.taller-lista li.activa i,
+.taller-lista li.activa b {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.taller-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.taller-chip {
+  padding: 6px 12px;
+  border: 1px solid var(--t-borde);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--t-texto);
+  font: 600 10.5px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.taller-chip:hover {
+  border-color: var(--t-naranja);
+}
+
+.taller-chip.activo {
+  border-color: var(--t-naranja);
+  background: var(--t-naranja);
+  color: #fff;
+}
+
+/* Tarjeta de la pieza elegida: acento ámbar y filete cian, unida a la pieza por la línea guía. */
+.taller-pieza {
+  border-left: 3px solid var(--t-naranja);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.taller-pieza > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--t-tenue);
+  font: 600 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.taller-pieza-cerrar {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--t-tenue);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.taller-pieza-cerrar:hover {
+  background: rgba(242, 106, 33, 0.12);
+  color: var(--t-naranja);
+}
+
+.taller-pieza h2 {
+  margin: 6px 0 10px;
+  color: var(--t-naranja);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+
+.taller-pieza h3 {
+  margin: 0 0 3px;
+  color: var(--t-tenue);
+  font: 600 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.taller-pieza p {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.taller-pieza footer {
+  display: grid;
+  gap: 6px;
+}
+
+.taller-pieza footer small {
+  color: var(--t-tenue);
+  font: 500 10.5px ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.taller-sello {
+  justify-self: start;
+  padding: 3px 8px;
+  border: 1px solid #e5b24a;
+  border-radius: 6px;
+  background: #fff6df;
+  color: #8a5a00;
+  font: 600 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.06em;
+}
+
+.taller-sello--ok {
+  border-color: #6fcfa0;
+  background: #e6f8ee;
+  color: #1c7a4c;
+}
+
+.taller-registro {
+  position: absolute;
+  left: 280px;
+  right: 322px;
+  bottom: 34px;
+  padding-bottom: 12px;
+}
+
+.taller-registro-fila {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.taller-boton {
+  flex: none;
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--t-naranja);
+  color: #fff;
+  font: 700 12px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(242, 106, 33, 0.3);
+}
+
+.taller-boton:hover {
+  filter: brightness(1.06);
+}
+
+.taller-barra-caja {
+  position: relative;
+  flex: 1;
+  height: 22px;
+}
+
+.taller-barra-caja::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 10px;
+  height: 2px;
+  background: var(--t-borde);
+}
+
+.taller-barra-relleno {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  height: 2px;
+  background: var(--t-naranja);
+}
+
+.taller-barra {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.taller-barra::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 22px;
+}
+
+.taller-barra::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 4px;
+  border: 2px solid var(--t-naranja);
+  border-radius: 50%;
+  background: #fff;
+}
+
+.taller-barra::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--t-naranja);
+  border-radius: 50%;
+  background: #fff;
+}
+
+.taller-ayuda {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 10px;
+  margin: 0;
+  color: var(--t-tenue);
+  font: 500 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.08em;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Línea guía de la pieza a su tarjeta: cian como el borde de la pieza. */
+.taller-guia {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.taller-guia line {
+  stroke: var(--t-cian);
+  stroke-width: 1.5;
+}
+
+.taller-guia circle {
+  fill: #fff;
+  stroke: var(--t-cian);
+  stroke-width: 2;
+}
+
+@media (max-width: 1080px) {
+  .taller-registro {
+    left: 16px;
+    right: 16px;
+  }
+  .taller-columna--izq {
+    display: none;
+  }
+}

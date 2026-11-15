@@ -298,6 +298,30 @@ export function parte(nombre: string, fn: () => void): void {
   }
 }
 
+/** Una primitiva del modelo, guardada por separado (taller 3D del LRV: cada pieza se puede separar y señalar). */
+export interface PiezaCapturada {
+  /** Posiciones y colores por vértice, en los ejes del lote y sin índices. */
+  geo: THREE.BufferGeometry;
+  /** Acabado con el que se fusionaría en el modelo normal. */
+  acabado: 'opaco' | 'metal' | 'satinado' | 'rejilla';
+  /** Pila de `parte()` activa al añadirla: la última es la más específica. */
+  partes: string[];
+}
+
+/** Con true, cada `Lote.pieza` guarda además una copia suelta en `userData.piezas` del grupo del lote. */
+let capturarPiezas = false;
+
+/** Ejecuta `fn` guardando cada pieza por separado (ver `PiezaCapturada`). No cambia el modelo que se construye. */
+export function capturandoPiezas<T>(fn: () => T): T {
+  const previo = capturarPiezas;
+  capturarPiezas = true;
+  try {
+    return fn();
+  } finally {
+    capturarPiezas = previo;
+  }
+}
+
 /** Acumula piezas estáticas y las fusiona por material. */
 export class Lote {
   private readonly opacas: THREE.BufferGeometry[] = [];
@@ -311,6 +335,8 @@ export class Lote {
   private matriz = new THREE.Matrix4();
   /** Copias de las piezas de cada parte con nombre (solo con `registrandoPartes`). */
   private readonly partes = new Map<string, THREE.BufferGeometry[]>();
+  /** Piezas sueltas (solo con `capturandoPiezas`). */
+  private readonly capturadas: PiezaCapturada[] = [];
 
   /**
    * `acabado`: 'museo' (rugosidad 0.75 y metalicidad 0.2, como pide el estilo) o 'mate' (suelo lunar).
@@ -333,12 +359,25 @@ export class Lote {
   /** Pieza mate iluminada. */
   pieza(geo: THREE.BufferGeometry, color: ColorCara, t: Transformacion = {}): void {
     if (t.m === 'satinado') {
-      this.satinadas.push(this.anotar(this.prepararSuave(geo, color, t)));
+      const g = this.anotar(this.prepararSuave(geo, color, t));
+      this.satinadas.push(g);
+      this.capturar(g, 'satinado');
       return;
     }
     const metal = t.m === 'metal' || (t.m === undefined && typeof color === 'number' && this.coloresMetal.has(color));
     const lista = metal ? this.metales : t.m === 'rejilla' ? this.rejillas : this.opacas;
-    lista.push(this.anotar(this.preparar(geo, color, 1, t)));
+    const g = this.anotar(this.preparar(geo, color, 1, t));
+    lista.push(g);
+    this.capturar(g, metal ? 'metal' : t.m === 'rejilla' ? 'rejilla' : 'opaco');
+  }
+
+  /** Con `capturandoPiezas`, guarda una copia suelta de `g` (posiciones y colores) con las partes activas. */
+  private capturar(g: THREE.BufferGeometry, acabado: PiezaCapturada['acabado']): void {
+    if (!capturarPiezas) return;
+    const copia = new THREE.BufferGeometry();
+    copia.setAttribute('position', g.getAttribute('position').clone());
+    copia.setAttribute('color', g.getAttribute('color').clone());
+    this.capturadas.push({ geo: copia, acabado, partes: [...partesActivas] });
   }
 
   /** Pieza que emite luz. `intensidad` > 1.2 hace que florezca con el bloom. */
@@ -413,6 +452,7 @@ export class Lote {
       this.partes.clear();
       grupo.userData.partes = partes;
     }
+    if (this.capturadas.length > 0) grupo.userData.piezas = this.capturadas.splice(0);
     return grupo;
   }
 

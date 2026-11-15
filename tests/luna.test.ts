@@ -244,3 +244,13 @@ test('con cámara, el aplauso sentado sigue volviendo al museo', () => {
   const eventos = m.update(entrada({ aplauso: true, jugador: m.posicion }));
   assert.equal(eventos.some((e) => e.tipo === 'volver'), true);
 });
+
+test('exploración libre: sin roca ni halo, y el LRV pasa por el sitio del LM sin que nada lo frene', () => {
+  const m = new MisionLuna('sentado_en_LRV', undefined, undefined, true);
+  assert.equal(m.haloVisible, false);
+  assert.equal(m.rocaResaltada, false);
+  assert.equal(m.aPie, false);
+  const base = { ahoraS: 0, dtS: 0.1, aplauso: false, metros: 1, volanteGrados: 0, velocidadGolpeHombrosS: 0, agarreNuevo: false, jugador: { x: 0, z: 0 } };
+  for (let i = 0; i < 20; i++) m.update({ ...base, ahoraS: i * 0.1 });
+  assert.equal(m.estado, 'conduciendo');
+});

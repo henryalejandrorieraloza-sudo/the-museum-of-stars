@@ -38,6 +38,8 @@ export type EventoMuseo =
   | { tipo: 'vitrinaDeseleccionada'; id: VitrinaId; explicada: boolean }
   /** El mentor terminó de hablar de esta vitrina: ya se puede aplaudir para entrar. */
   | { tipo: 'listoParaEntrar'; id: VitrinaId }
+  /** El jugador aplaudió (o pulsó espacio) tras la explicación de una vitrina con misión: toca elegir cómo explorarla. */
+  | { tipo: 'elegirModo'; id: VitrinaId }
   /** Empieza la presentación previa a la misión. `visible`: false si la escena 3D no se pudo montar. */
   | { tipo: 'presentacionAbierta'; mision: Mision; visible: boolean }
   | { tipo: 'misionAbierta'; mision: Mision }
@@ -46,9 +48,10 @@ export type EventoMuseo =
 /**
  * Fase de la vitrina seleccionada (SPEC 7.2):
  * - `hablando`: el mentor explica la vitrina; aplaudir o pulsar espacio no hace nada.
- * - `listo`: el mentor ya terminó; aplaudir o pulsar espacio entra a la escena.
+ * - `listo`: el mentor ya terminó; aplaudir o pulsar espacio abre la pantalla de modos.
+ * - `modos`: la pantalla de modos está abierta (historia, taller 3D o exploración libre); el museo no recibe entradas.
  */
-type Fase = 'hablando' | 'listo';
+type Fase = 'hablando' | 'listo' | 'modos';
 
 /** Entrada de un fotograma de juego, ya traducida a acciones de museo. */
 export interface EntradaMuseo {
@@ -157,12 +160,20 @@ export class Museo {
     // Con una vitrina seleccionada, el flujo (explicación, aviso y entrada) no lo interrumpe nada (SPEC 7.2):
     // ni el cursor, ni la cabeza, ni la caminata, ni perder el seguimiento. La selección no cambia hasta entrar.
     if (this.seleccionada !== null) {
-      // Aplauso o espacio: entra solo cuando el mentor ya terminó. Mientras habla, no hace nada.
+      // Con la pantalla de modos abierta, el museo se queda quieto.
+      if (this.fase === 'modos') return;
+      // Aplauso o espacio: solo cuando el mentor ya terminó. Mientras habla, no hace nada.
       // No se comprueba dónde está el jugador ni hacia dónde mira.
       const mision = MISION_DE[this.seleccionada];
       if (entrada.accion && this.fase === 'listo' && mision !== null) {
         const id = this.seleccionada;
-        this.iniciarTransicion(() => (CON_PRESENTACION.has(id) ? this.abrirPresentacion(mision) : this.abrirMision(mision)));
+        if (CON_PRESENTACION.has(id)) {
+          // Vitrina del LRV: antes de entrar se elige cómo (historia, taller 3D o exploración libre).
+          this.fase = 'modos';
+          this.emitir({ tipo: 'elegirModo', id });
+        } else {
+          this.iniciarTransicion(() => this.abrirMision(mision));
+        }
         return;
       }
       visual.museo.moverCamara(entrada.giroGrados, entrada.metros, entrada.cabeceoGrados, entrada.lateralMetros);
@@ -206,6 +217,33 @@ export class Museo {
   abrirMisionDirecta(mision: Mision): void {
     if (this.transicion || this.pantallaActual.tipo !== 'museo') return;
     this.iniciarTransicion(() => this.abrirMision(mision));
+  }
+
+  /**
+   * Modo historia de la pantalla de modos: la presentación del LRV y, al terminar, la misión lunar de siempre. Solo con
+   * la pantalla de modos abierta (fase `modos`).
+   */
+  iniciarHistoria(): void {
+    const id = this.seleccionada;
+    if (this.transicion || this.fase !== 'modos' || id === null || MISION_DE[id] === null) return;
+    const mision = MISION_DE[id];
+    this.iniciarTransicion(() => this.abrirPresentacion(mision));
+  }
+
+  /** Modo exploración libre: entra a la Luna sin presentación (juego.ts ya preparó la escena en modo libre). */
+  iniciarLibre(): void {
+    const id = this.seleccionada;
+    if (this.transicion || this.fase !== 'modos' || id === null || MISION_DE[id] === null) return;
+    const mision = MISION_DE[id];
+    this.iniciarTransicion(() => this.abrirMision(mision));
+  }
+
+  /** Se cierra la pantalla de modos sin elegir nada: la vitrina se suelta y no se vuelve a elegir hasta dejar de señalarla. */
+  cancelarModos(): void {
+    if (this.fase !== 'modos' || this.seleccionada === null) return;
+    this.recienExplicada = this.seleccionada;
+    this.candidata = null;
+    this.deseleccionar();
   }
 
   private iniciarTransicion(cambio: () => void): void {

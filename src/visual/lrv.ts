@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { COLOR_LRV, Lote, METALES_LRV, MallaLibre, SUELO_LUNA, azar, cajaBiselada, parte, registrandoPartes, tuboEntre, type V3 } from './paleta';
+import { COLOR_LRV, Lote, METALES_LRV, MallaLibre, SUELO_LUNA, azar, cajaBiselada, capturandoPiezas, parte, registrandoPartes, tuboEntre, type PiezaCapturada, type V3 } from './paleta';
 
 // Lunar Roving Vehicle de Apollo 17 para la escena lunar, low poly facetado (caras planas, sin superficies suaves) y
 // con muchos polígonos. Frente hacia −Z, origen en el suelo y centrado. Solo lleva lo que tenía el LRV real: chasis de
@@ -177,46 +177,58 @@ function chevronesRueda(): THREE.BufferGeometry {
 function ruedaRodante(l: Lote, interior: Lote, lado: number): void {
   const w = ANCHO_RUEDA / 2;
   // Interior oscuro visto a través del tejido. Va en su lote, sin polvo, para que siga oscuro.
-  interior.pieza(new THREE.CylinderGeometry(RADIO_RUEDA - 0.012, RADIO_RUEDA - 0.012, ANCHO_RUEDA * 0.97, LADOS_RUEDA, 1, true), COLOR_LRV.interiorRueda, { r: [0, 0, Math.PI / 2] });
+  parte('ruedaInterior', () =>
+    interior.pieza(new THREE.CylinderGeometry(RADIO_RUEDA - 0.012, RADIO_RUEDA - 0.012, ANCHO_RUEDA * 0.97, LADOS_RUEDA, 1, true), COLOR_LRV.interiorRueda, { r: [0, 0, Math.PI / 2] }),
+  );
   parte('malla', () => l.pieza(mallaRueda(), COLOR_LRV.rueda, { v: 0.12 }));
   parte('chevrones', () => l.pieza(chevronesRueda(), COLOR_LRV.chevron, { v: 0.08 }));
   for (const s of [-1, 1]) {
     const xf = s * (w - 0.004);
     // Flanco de malla: corona facetada del aro al disco, con nervios radiales.
     const flanco = new THREE.RingGeometry(0.25, RADIO_RUEDA - 0.004, LADOS_RUEDA, 2);
-    l.pieza(flanco, COLOR_LRV.interiorRueda, { p: [xf, 0, 0], r: [0, s * (Math.PI / 2), 0], v: 0.1 });
+    parte('ruedaDisco', () => l.pieza(flanco, COLOR_LRV.interiorRueda, { p: [xf, 0, 0], r: [0, s * (Math.PI / 2), 0], v: 0.1 }));
     for (let k = 0; k < LADOS_RUEDA; k += 2) {
       const a = (k / LADOS_RUEDA) * Math.PI * 2;
-      l.pieza(new THREE.BoxGeometry(0.006, 0.006, RADIO_RUEDA - 0.26), COLOR_LRV.rueda, {
-        p: [xf + s * 0.003, Math.cos(a) * (RADIO_RUEDA + 0.25) * 0.5, Math.sin(a) * (RADIO_RUEDA + 0.25) * 0.5],
-        r: [a + Math.PI / 2, 0, 0],
-      });
+      parte('ruedaNervio', () =>
+        l.pieza(new THREE.BoxGeometry(0.006, 0.006, RADIO_RUEDA - 0.26), COLOR_LRV.rueda, {
+          p: [xf + s * 0.003, Math.cos(a) * (RADIO_RUEDA + 0.25) * 0.5, Math.sin(a) * (RADIO_RUEDA + 0.25) * 0.5],
+          r: [a + Math.PI / 2, 0, 0],
+        }),
+      );
     }
     // Aro exterior de la banda.
-    l.pieza(new THREE.TorusGeometry(RADIO_RUEDA - 0.006, 0.009, 4, LADOS_RUEDA), COLOR_LRV.gris, { p: [xf, 0, 0], r: [0, Math.PI / 2, 0] });
+    parte('ruedaAro', () => l.pieza(new THREE.TorusGeometry(RADIO_RUEDA - 0.006, 0.009, 4, LADOS_RUEDA), COLOR_LRV.gris, { p: [xf, 0, 0], r: [0, Math.PI / 2, 0] }));
   }
   // Por fuera: aro de aluminio con pernos, disco oscuro hundido y el cubo blanco.
   const xa = lado * (w + 0.006);
-  l.pieza(new THREE.CylinderGeometry(0.25, 0.25, 0.026, LADOS_RUEDA, 1, true), COLOR_LRV.gris, { p: [xa, 0, 0], r: [0, 0, Math.PI / 2] });
-  const corona = new THREE.RingGeometry(0.19, 0.25, LADOS_RUEDA, 1);
-  l.pieza(corona, COLOR_LRV.gris, { p: [xa + lado * 0.013, 0, 0], r: [0, lado * (Math.PI / 2), 0], v: 0.05 });
+  parte('ruedaAroAluminio', () => {
+    l.pieza(new THREE.CylinderGeometry(0.25, 0.25, 0.026, LADOS_RUEDA, 1, true), COLOR_LRV.gris, { p: [xa, 0, 0], r: [0, 0, Math.PI / 2] });
+    const corona = new THREE.RingGeometry(0.19, 0.25, LADOS_RUEDA, 1);
+    l.pieza(corona, COLOR_LRV.gris, { p: [xa + lado * 0.013, 0, 0], r: [0, lado * (Math.PI / 2), 0], v: 0.05 });
+  });
   for (let k = 0; k < 8; k++) {
     const a = (k / 8) * Math.PI * 2;
-    l.pieza(new THREE.BoxGeometry(0.012, 0.014, 0.014), COLOR_LRV.cubo, { p: [xa + lado * 0.018, Math.cos(a) * 0.22, Math.sin(a) * 0.22], r: [a, 0, 0] });
+    parte('ruedaPerno', () =>
+      l.pieza(new THREE.BoxGeometry(0.012, 0.014, 0.014), COLOR_LRV.cubo, { p: [xa + lado * 0.018, Math.cos(a) * 0.22, Math.sin(a) * 0.22], r: [a, 0, 0] }),
+    );
   }
-  l.pieza(new THREE.CylinderGeometry(0.19, 0.19, 0.012, LADOS_RUEDA), COLOR_LRV.interiorRueda, { p: [xa - lado * 0.01, 0, 0], r: [0, 0, Math.PI / 2] });
-  l.pieza(new THREE.CylinderGeometry(0.075, 0.075, 0.05, 10), COLOR_LRV.cubo, { p: [xa + lado * 0.02, 0, 0], r: [0, 0, Math.PI / 2], v: 0.04 });
-  l.pieza(new THREE.CylinderGeometry(0.05, 0.065, 0.025, 10), COLOR_LRV.cubo, { p: [xa + lado * 0.055, 0, 0], r: [0, 0, -lado * Math.PI / 2] });
+  parte('ruedaCubo', () => {
+    l.pieza(new THREE.CylinderGeometry(0.19, 0.19, 0.012, LADOS_RUEDA), COLOR_LRV.interiorRueda, { p: [xa - lado * 0.01, 0, 0], r: [0, 0, Math.PI / 2] });
+    l.pieza(new THREE.CylinderGeometry(0.075, 0.075, 0.05, 10), COLOR_LRV.cubo, { p: [xa + lado * 0.02, 0, 0], r: [0, 0, Math.PI / 2], v: 0.04 });
+    l.pieza(new THREE.CylinderGeometry(0.05, 0.065, 0.025, 10), COLOR_LRV.cubo, { p: [xa + lado * 0.055, 0, 0], r: [0, 0, -lado * Math.PI / 2] });
+  });
 }
 
 /** Motor de tracción y caja armónica en el cubo, hacia dentro: giran con la dirección, pero no ruedan. */
 function motorRueda(l: Lote, lado: number): void {
   const x = -lado * (ANCHO_RUEDA / 2 + 0.05);
-  l.pieza(new THREE.CylinderGeometry(0.11, 0.11, 0.16, 10), COLOR_LRV.gris, { p: [x, 0, 0], r: [0, 0, Math.PI / 2], v: 0.06 });
-  l.pieza(new THREE.CylinderGeometry(0.125, 0.125, 0.025, 10), COLOR_LRV.blanco, { p: [x + lado * 0.07, 0, 0], r: [0, 0, Math.PI / 2] });
-  l.pieza(new THREE.CylinderGeometry(0.08, 0.1, 0.03, 12), COLOR_LRV.blanco, { p: [x - lado * 0.09, 0, 0], r: [0, 0, Math.PI / 2] });
+  parte('motorTraccion', () => l.pieza(new THREE.CylinderGeometry(0.11, 0.11, 0.16, 10), COLOR_LRV.gris, { p: [x, 0, 0], r: [0, 0, Math.PI / 2], v: 0.06 }));
+  parte('cajaArmonica', () => {
+    l.pieza(new THREE.CylinderGeometry(0.125, 0.125, 0.025, 10), COLOR_LRV.blanco, { p: [x + lado * 0.07, 0, 0], r: [0, 0, Math.PI / 2] });
+    l.pieza(new THREE.CylinderGeometry(0.08, 0.1, 0.03, 12), COLOR_LRV.blanco, { p: [x - lado * 0.09, 0, 0], r: [0, 0, Math.PI / 2] });
+  });
   // Brazo de dirección del cubo, donde se unen los brazos de la suspensión.
-  l.pieza(new THREE.BoxGeometry(0.05, 0.2, 0.07), COLOR_LRV.blanco, { p: [x - lado * 0.04, 0, 0] });
+  parte('brazoDireccion', () => l.pieza(new THREE.BoxGeometry(0.05, 0.2, 0.07), COLOR_LRV.blanco, { p: [x - lado * 0.04, 0, 0] }));
 }
 
 /** Una rueda del LRV en el modelo: el pivote gira con la dirección (eje Y) y el buje rueda (eje X). */
@@ -380,13 +392,13 @@ function bandera(l: Lote, p: V3, a: number, fuera: number): void {
   const largo = 0.17;
   const franja = alto / 13;
   // Ejes locales: X hacia fuera, Y radial (arriba de la bandera) y Z a lo largo del arco.
-  l.en(p, [a, 0, 0], () => {
+  parte('bandera', () => l.en(p, [a, 0, 0], () => {
     l.pieza(new THREE.BoxGeometry(0.003, alto, largo), COLOR_LRV.banderaBlanco, { p: [fuera * 0.0015, 0, 0] });
     for (let k = 0; k < 7; k++) {
       l.pieza(new THREE.BoxGeometry(0.002, franja, largo), COLOR_LRV.banderaRojo, { p: [fuera * 0.003, alto / 2 - franja * (2 * k + 0.5), 0] });
     }
     l.pieza(new THREE.BoxGeometry(0.002, franja * 7, largo * 0.4), COLOR_LRV.banderaAzul, { p: [fuera * 0.0045, alto / 2 - franja * 3.5, -largo * 0.3] });
-  });
+  }));
 }
 
 /**
@@ -399,27 +411,35 @@ function guardabarros(l: Lote, extDelante: Lote, extDetras: Lote, x: number, z: 
   const radio = RADIO_RUEDA + 0.03;
   const medio = ANCHO_RUEDA / 2 + 0.045;
   const fuera = Math.sign(x);
-  l.pieza(barridoArco(perfilConcha(medio, radio), x, z, -1.25, 1.25, 10), COLOR_LRV.naranja, { v: 0.06 });
-  extDelante.pieza(barridoArco(perfilConcha(medio + 0.006, radio + 0.012), x, z, -1.65, -1.2, 3), COLOR_LRV.naranja, { v: 0.06 });
-  extDetras.pieza(barridoArco(perfilConcha(medio + 0.006, radio + 0.012), x, z, 1.2, 1.65, 3), COLOR_LRV.naranja, { v: 0.06 });
+  parte('guardabarros', () => l.pieza(barridoArco(perfilConcha(medio, radio), x, z, -1.25, 1.25, 10), COLOR_LRV.naranja, { v: 0.06 }));
+  parte('extensionGuardabarros', () => {
+    extDelante.pieza(barridoArco(perfilConcha(medio + 0.006, radio + 0.012), x, z, -1.65, -1.2, 3), COLOR_LRV.naranja, { v: 0.06 });
+    extDetras.pieza(barridoArco(perfilConcha(medio + 0.006, radio + 0.012), x, z, 1.2, 1.65, 3), COLOR_LRV.naranja, { v: 0.06 });
+  });
   // Bordes de los labios, más oscuros.
   for (const s of [-1, 1]) {
-    l.pieza(barridoArco(perfilRect(s * medio - 0.008, s * medio + 0.008, radio - 0.012, radio + 0.012), x, z, -1.25, 1.25, 10), COLOR_LRV.naranjaBorde);
+    parte('bordeGuardabarros', () =>
+      l.pieza(barridoArco(perfilRect(s * medio - 0.008, s * medio + 0.008, radio - 0.012, radio + 0.012), x, z, -1.25, 1.25, 10), COLOR_LRV.naranjaBorde),
+    );
   }
   // Riel oscuro remachado a lo largo del guardabarros, hacia dentro, por el que corren las extensiones.
   const ur = -fuera * medio * 0.45;
   const vr = radio + Math.cos(Math.asin(0.45)) * 0.085 + 0.012;
-  l.pieza(barridoArco(perfilRect(ur - 0.014, ur + 0.014, vr - 0.004, vr + 0.006), x, z, -1.2, 1.2, 10), COLOR_LRV.negro);
+  parte('rielGuardabarros', () => l.pieza(barridoArco(perfilRect(ur - 0.014, ur + 0.014, vr - 0.004, vr + 0.006), x, z, -1.2, 1.2, 10), COLOR_LRV.negro));
   for (let k = 0; k <= 7; k++) {
     const a = -1.1 + (2.2 * k) / 7;
-    l.pieza(new THREE.BoxGeometry(0.008, 0.008, 0.008), COLOR_LRV.cubo, { p: [x + ur, RADIO_RUEDA + Math.cos(a) * (vr + 0.008), z + Math.sin(a) * (vr + 0.008)], r: [a, 0, 0] });
+    parte('remache', () =>
+      l.pieza(new THREE.BoxGeometry(0.008, 0.008, 0.008), COLOR_LRV.cubo, { p: [x + ur, RADIO_RUEDA + Math.cos(a) * (vr + 0.008), z + Math.sin(a) * (vr + 0.008)], r: [a, 0, 0] }),
+    );
   }
   // Bandera en el costado de fuera, abajo delante en las ruedas delanteras y abajo detrás en las traseras.
   const aBandera = z < 0 ? -0.95 : 0.95;
   bandera(l, [x + fuera * (medio + 0.004), RADIO_RUEDA + Math.cos(aBandera) * (radio + 0.03), z + Math.sin(aBandera) * (radio + 0.03)], aBandera, fuera);
   // Soporte del guardabarros al bastidor.
   const lado = Math.sign(x);
-  l.pieza(tuboEntre([lado * MEDIO_ANCHO_BASTIDOR, Y_BASTIDOR + 0.05, z], [x - lado * 0.06, RADIO_RUEDA + radio + 0.03, z], 0.011, 4, false), COLOR_LRV.gris);
+  parte('soporteGuardabarros', () =>
+    l.pieza(tuboEntre([lado * MEDIO_ANCHO_BASTIDOR, Y_BASTIDOR + 0.05, z], [x - lado * 0.06, RADIO_RUEDA + radio + 0.03, z], 0.011, 4, false), COLOR_LRV.gris),
+  );
 }
 
 /** Rectángulo (u0..u1, v0..v1) como perfil cerrado para `barridoArco`. */
@@ -444,15 +464,19 @@ function suspension(l: Lote, x: number, z: number): void {
     [Y_BASTIDOR + 0.07, 0.2],
   ] as const) {
     for (const s of [-1, 1]) {
-      l.pieza(tuboEntre([lado * MEDIO_ANCHO_BASTIDOR, y, z + s * apertura], [cubo, RADIO_RUEDA + (y - Y_BASTIDOR) * 0.5, z], 0.016, 6, false), COLOR_LRV.gris);
+      parte('horquilla', () =>
+        l.pieza(tuboEntre([lado * MEDIO_ANCHO_BASTIDOR, y, z + s * apertura], [cubo, RADIO_RUEDA + (y - Y_BASTIDOR) * 0.5, z], 0.016, 6, false), COLOR_LRV.gris),
+      );
     }
-    l.pieza(tuboEntre([lado * MEDIO_ANCHO_BASTIDOR, y, z - apertura - 0.04], [lado * MEDIO_ANCHO_BASTIDOR, y, z + apertura + 0.04], 0.022, 8), COLOR_LRV.gris);
+    parte('barraTorsion', () => l.pieza(tuboEntre([lado * MEDIO_ANCHO_BASTIDOR, y, z - apertura - 0.04], [lado * MEDIO_ANCHO_BASTIDOR, y, z + apertura + 0.04], 0.022, 8), COLOR_LRV.gris));
   }
   const arriba: V3 = [lado * (MEDIO_ANCHO_BASTIDOR - 0.02), Y_BASTIDOR + 0.2, z + 0.12];
   const abajo: V3 = [(lado * MEDIO_ANCHO_BASTIDOR + cubo) / 2, Y_BASTIDOR + 0.04, z + 0.04];
   const medio: V3 = [(arriba[0] + abajo[0]) / 2, (arriba[1] + abajo[1]) / 2, (arriba[2] + abajo[2]) / 2];
-  l.pieza(tuboEntre(arriba, medio, 0.022, 8), COLOR_LRV.blanco);
-  l.pieza(tuboEntre(medio, abajo, 0.01, 6, false), COLOR_LRV.gris);
+  parte('amortiguador', () => {
+    l.pieza(tuboEntre(arriba, medio, 0.022, 8), COLOR_LRV.blanco);
+    l.pieza(tuboEntre(medio, abajo, 0.01, 6, false), COLOR_LRV.gris);
+  });
 }
 
 /** Lotes de las tres secciones del chasis: cada una se pliega por separado. */
@@ -499,37 +523,39 @@ function bastidorPiezas(s: Secciones): void {
       [l, -Z_BISAGRA, Z_BISAGRA],
       [s.trasera, Z_BISAGRA, Z_COLA],
     ] as const) {
-      perfilCuadrado(sec, [x, Y_BASTIDOR, z0], [x, Y_BASTIDOR, z1], 0.025, true);
+      parte('larguero', () => perfilCuadrado(sec, [x, Y_BASTIDOR, z0], [x, Y_BASTIDOR, z1], 0.025, true));
       // Aligeramientos oscuros en la cara de fuera del larguero.
       for (let z = z0 + 0.12; z < z1 - 0.08; z += 0.16) {
-        sec.pieza(new THREE.BoxGeometry(0.004, 0.018, 0.04), COLOR_LRV.negro, { p: [x + Math.sign(x) * 0.026, Y_BASTIDOR, z] });
+        parte('aligeramiento', () => sec.pieza(new THREE.BoxGeometry(0.004, 0.018, 0.04), COLOR_LRV.negro, { p: [x + Math.sign(x) * 0.026, Y_BASTIDOR, z] }));
       }
     }
-    perfilCuadrado(l, [x, yAlto, -Z_BISAGRA], [x, yAlto, Z_BISAGRA], 0.014);
-    for (const z of [-0.62, -0.31, 0, 0.31, 0.62]) perfilCuadrado(l, [x, Y_BASTIDOR, z], [x, yAlto, z], 0.01);
+    parte('celosia', () => perfilCuadrado(l, [x, yAlto, -Z_BISAGRA], [x, yAlto, Z_BISAGRA], 0.014));
+    for (const z of [-0.62, -0.31, 0, 0.31, 0.62]) parte('celosia', () => perfilCuadrado(l, [x, Y_BASTIDOR, z], [x, yAlto, z], 0.01));
     for (const [z0, z1] of [
       [-0.62, -0.31],
       [-0.31, 0],
       [0, 0.31],
       [0.31, 0.62],
     ] as const) {
-      perfilCuadrado(l, [x, Y_BASTIDOR, z0], [x, yAlto, z1], 0.007);
+      parte('celosia', () => perfilCuadrado(l, [x, Y_BASTIDOR, z0], [x, yAlto, z1], 0.007));
     }
     for (const [sec, z0, z1] of [
       [s.delantera, Z_FRENTE + 0.04, -Z_BISAGRA - 0.04],
       [s.trasera, Z_BISAGRA + 0.04, Z_COLA - 0.04],
     ] as const) {
-      perfilCuadrado(sec, [x, Y_BASTIDOR + 0.07, z0], [x, Y_BASTIDOR + 0.07, z1], 0.01);
+      parte('celosia', () => perfilCuadrado(sec, [x, Y_BASTIDOR + 0.07, z0], [x, Y_BASTIDOR + 0.07, z1], 0.01));
       const zm = (z0 + z1) / 2;
-      for (const z of [z0, zm, z1]) perfilCuadrado(sec, [x, Y_BASTIDOR, z], [x, Y_BASTIDOR + 0.07, z], 0.008);
+      for (const z of [z0, zm, z1]) parte('celosia', () => perfilCuadrado(sec, [x, Y_BASTIDOR, z], [x, Y_BASTIDOR + 0.07, z], 0.008));
     }
     for (const z of [-Z_BISAGRA, Z_BISAGRA]) {
-      l.pieza(new THREE.CylinderGeometry(0.032, 0.032, 0.08, 12), COLOR_LRV.gris, { p: [x, Y_BASTIDOR, z], r: [0, 0, Math.PI / 2] });
-      l.pieza(new THREE.BoxGeometry(0.045, 0.065, 0.09), COLOR_LRV.blanco, { p: [x, Y_BASTIDOR + 0.03, z] });
+      parte('bisagra', () => {
+        l.pieza(new THREE.CylinderGeometry(0.032, 0.032, 0.08, 12), COLOR_LRV.gris, { p: [x, Y_BASTIDOR, z], r: [0, 0, Math.PI / 2] });
+        l.pieza(new THREE.BoxGeometry(0.045, 0.065, 0.09), COLOR_LRV.blanco, { p: [x, Y_BASTIDOR + 0.03, z] });
+      });
     }
   }
   for (const z of [Z_FRENTE, -1.05, -Z_BISAGRA, 0, Z_BISAGRA, 1.05, Z_COLA]) {
-    perfilCuadrado(seccionEn(s, z), [-w, Y_BASTIDOR, z], [w, Y_BASTIDOR, z], 0.016, Math.abs(z) > 1.4);
+    parte('travesano', () => perfilCuadrado(seccionEn(s, z), [-w, Y_BASTIDOR, z], [w, Y_BASTIDOR, z], 0.016, Math.abs(z) > 1.4));
   }
 }
 
@@ -544,7 +570,7 @@ function pisoListones(s: Secciones): void {
   ] as const) {
     for (let k = 0; k < 10; k++) {
       const x = -w + 0.06 + ((2 * w - 0.12) * k) / 9;
-      sec.pieza(new THREE.BoxGeometry(0.035, 0.012, z1 - z0), COLOR_LRV.blanco, { p: [x, Y_BASTIDOR + 0.018, (z0 + z1) / 2], v: 0.04 });
+      parte('piso', () => sec.pieza(new THREE.BoxGeometry(0.035, 0.012, z1 - z0), COLOR_LRV.blanco, { p: [x, Y_BASTIDOR + 0.018, (z0 + z1) / 2], v: 0.04 }));
     }
   }
 }
@@ -561,13 +587,17 @@ function asientos(centro: Lote, asiento: readonly Lote[], reposapies: readonly L
     parte('asientos', () => asientoPiezas(l, x));
     // Reposapiés delante del asiento, en la parte delantera de la sección central.
     const pie = reposapies[i];
-    pie.pieza(cajaBiselada(0.34, 0.012, 0.16, 0.004), COLOR_LRV.blanco, { p: [x, Y_BASTIDOR + 0.1, -0.5], r: [0.45, 0, 0] });
-    for (const sx of [-1, 1]) varilla(pie, [x + sx * 0.16, Y_BASTIDOR + 0.03, -0.44], [x + sx * 0.16, Y_BASTIDOR + 0.1, -0.5], 0.007, COLOR_LRV.gris, 6);
+    parte('reposapies', () => {
+      pie.pieza(cajaBiselada(0.34, 0.012, 0.16, 0.004), COLOR_LRV.blanco, { p: [x, Y_BASTIDOR + 0.1, -0.5], r: [0.45, 0, 0] });
+      for (const sx of [-1, 1]) varilla(pie, [x + sx * 0.16, Y_BASTIDOR + 0.03, -0.44], [x + sx * 0.16, Y_BASTIDOR + 0.1, -0.5], 0.007, COLOR_LRV.gris, 6);
+    });
   });
   // Reposabrazos central naranja sobre su caja blanca, con el mando en T delante.
-  centro.pieza(cajaBiselada(0.11, 0.14, 0.42, 0.02), COLOR_LRV.blanco, { p: [0, Y_ASIENTO + 0.03, Z_ASIENTO + 0.05], v: 0.04 });
-  centro.pieza(cajaBiselada(0.1, 0.035, 0.36, 0.012), COLOR_LRV.naranja, { p: [0, Y_ASIENTO + 0.12, Z_ASIENTO + 0.08] });
-  varilla(centro, [0, Y_BASTIDOR + 0.12, Z_ASIENTO + 0.05], [0, Y_ASIENTO - 0.04, Z_ASIENTO + 0.05], 0.014);
+  parte('reposabrazos', () => {
+    centro.pieza(cajaBiselada(0.11, 0.14, 0.42, 0.02), COLOR_LRV.blanco, { p: [0, Y_ASIENTO + 0.03, Z_ASIENTO + 0.05], v: 0.04 });
+    centro.pieza(cajaBiselada(0.1, 0.035, 0.36, 0.012), COLOR_LRV.naranja, { p: [0, Y_ASIENTO + 0.12, Z_ASIENTO + 0.08] });
+    varilla(centro, [0, Y_BASTIDOR + 0.12, Z_ASIENTO + 0.05], [0, Y_ASIENTO - 0.04, Z_ASIENTO + 0.05], 0.014);
+  });
 }
 
 /** Un asiento (base de lona, marco, respaldo de cintas, asidero y cinturón) centrado en `x`, en el lote `l`. */
@@ -575,22 +605,28 @@ function asientoPiezas(l: Lote, x: number): void {
   const y = Y_BASE_ASIENTO;
   const exterior = Math.sign(x);
   // Base: lona naranja algo inclinada hacia atrás, con las patas del marco al bastidor.
-  l.pieza(new THREE.BoxGeometry(0.42, 0.014, 0.4), COLOR_LRV.naranja, { p: [x, y, Z_ASIENTO], r: [0.06, 0, 0], v: 0.05 });
-  for (const sx of [-1, 1]) {
-    const xs = x + sx * 0.22;
-    varilla(l, [xs, y, Z_ASIENTO - 0.21], [xs, y + 0.03, Z_ASIENTO + 0.21], 0.011);
-    for (const sz of [-1, 1]) varilla(l, [xs, Y_BASTIDOR + 0.12, Z_ASIENTO + sz * 0.18], [xs, y + 0.015 * sz, Z_ASIENTO + sz * 0.18], 0.011);
-  }
-  // Travesaño delantero curvado en tres tramos.
-  varilla(l, [x - 0.22, y, Z_ASIENTO - 0.21], [x - 0.16, y - 0.02, Z_ASIENTO - 0.24], 0.011);
-  varilla(l, [x - 0.16, y - 0.02, Z_ASIENTO - 0.24], [x + 0.16, y - 0.02, Z_ASIENTO - 0.24], 0.011);
-  varilla(l, [x + 0.16, y - 0.02, Z_ASIENTO - 0.24], [x + 0.22, y, Z_ASIENTO - 0.21], 0.011);
+  parte('asientoLona', () => l.pieza(new THREE.BoxGeometry(0.42, 0.014, 0.4), COLOR_LRV.naranja, { p: [x, y, Z_ASIENTO], r: [0.06, 0, 0], v: 0.05 }));
+  parte('asientoMarco', () => {
+    for (const sx of [-1, 1]) {
+      const xs = x + sx * 0.22;
+      varilla(l, [xs, y, Z_ASIENTO - 0.21], [xs, y + 0.03, Z_ASIENTO + 0.21], 0.011);
+      for (const sz of [-1, 1]) varilla(l, [xs, Y_BASTIDOR + 0.12, Z_ASIENTO + sz * 0.18], [xs, y + 0.015 * sz, Z_ASIENTO + sz * 0.18], 0.011);
+    }
+    // Travesaño delantero curvado en tres tramos.
+    varilla(l, [x - 0.22, y, Z_ASIENTO - 0.21], [x - 0.16, y - 0.02, Z_ASIENTO - 0.24], 0.011);
+    varilla(l, [x - 0.16, y - 0.02, Z_ASIENTO - 0.24], [x + 0.16, y - 0.02, Z_ASIENTO - 0.24], 0.011);
+    varilla(l, [x + 0.16, y - 0.02, Z_ASIENTO - 0.24], [x + 0.22, y, Z_ASIENTO - 0.21], 0.011);
+  });
   // Respaldo: marco de tubo y cintas naranjas cruzadas (tres horizontales y dos verticales).
   l.en([x, y + 0.22, Z_ASIENTO + 0.25], [-0.22, 0, 0], () => {
-    for (const sx of [-1, 1]) varilla(l, [sx * 0.21, -0.22, 0], [sx * 0.21, 0.22, 0], 0.011);
-    varilla(l, [-0.21, 0.22, 0], [0.21, 0.22, 0], 0.011);
-    for (const v of [-0.12, 0.0, 0.12]) l.pieza(new THREE.BoxGeometry(0.42, 0.055, 0.008), COLOR_LRV.naranja, { p: [0, v, 0], v: 0.06 });
-    for (const u of [-0.08, 0.08]) l.pieza(new THREE.BoxGeometry(0.055, 0.4, 0.008), COLOR_LRV.naranja, { p: [u, 0, 0.006], v: 0.06 });
+    parte('asientoMarco', () => {
+      for (const sx of [-1, 1]) varilla(l, [sx * 0.21, -0.22, 0], [sx * 0.21, 0.22, 0], 0.011);
+      varilla(l, [-0.21, 0.22, 0], [0.21, 0.22, 0], 0.011);
+    });
+    parte('asientoRespaldo', () => {
+      for (const v of [-0.12, 0.0, 0.12]) l.pieza(new THREE.BoxGeometry(0.42, 0.055, 0.008), COLOR_LRV.naranja, { p: [0, v, 0], v: 0.06 });
+      for (const u of [-0.08, 0.08]) l.pieza(new THREE.BoxGeometry(0.055, 0.4, 0.008), COLOR_LRV.naranja, { p: [u, 0, 0.006], v: 0.06 });
+    });
   });
   // Asidero exterior: arco de tubo junto al asiento, para subir y bajar.
   const xa = x + exterior * 0.27;
@@ -600,10 +636,14 @@ function asientoPiezas(l: Lote, x: number): void {
     [xa + exterior * 0.03, y + 0.16, Z_ASIENTO + 0.12],
     [xa, Y_BASTIDOR + 0.12, Z_ASIENTO + 0.2],
   ];
-  for (let k = 0; k < asidero.length - 1; k++) varilla(l, asidero[k], asidero[k + 1], 0.012);
+  parte('asidero', () => {
+    for (let k = 0; k < asidero.length - 1; k++) varilla(l, asidero[k], asidero[k + 1], 0.012);
+  });
   // Cinturón con su hebilla.
-  l.pieza(new THREE.BoxGeometry(0.04, 0.006, 0.42), COLOR_LRV.naranjaBorde, { p: [x, y + 0.014, Z_ASIENTO], r: [0, 0.6, 0] });
-  l.pieza(new THREE.BoxGeometry(0.05, 0.012, 0.035), COLOR_LRV.gris, { p: [x, y + 0.02, Z_ASIENTO], r: [0, 0.6, 0] });
+  parte('cinturon', () => {
+    l.pieza(new THREE.BoxGeometry(0.04, 0.006, 0.42), COLOR_LRV.naranjaBorde, { p: [x, y + 0.014, Z_ASIENTO], r: [0, 0.6, 0] });
+    l.pieza(new THREE.BoxGeometry(0.05, 0.012, 0.035), COLOR_LRV.gris, { p: [x, y + 0.02, Z_ASIENTO], r: [0, 0.6, 0] });
+  });
 }
 
 /** Base del mando en T (ejes del LRV), entre los asientos. */
@@ -620,8 +660,10 @@ export const PIVOTE_MANDO_LRV: V3 = [0, BASE_MANDO[1] + 0.06, BASE_MANDO[2] - 0.
 function mandos(l: Lote, palanca: Lote, consola: Lote): void {
   const base = BASE_MANDO;
   const cima: V3 = [0, Y_ASIENTO + 0.32, Z_ASIENTO - 0.24];
-  l.pieza(cajaBiselada(0.11, 0.07, 0.13, 0.015), COLOR_LRV.blanco, { p: base });
-  l.pieza(new THREE.CylinderGeometry(0.03, 0.045, 0.06, 12), COLOR_LRV.gris, { p: [0, base[1] + 0.06, base[2] - 0.005] });
+  parte('mandoBase', () => {
+    l.pieza(cajaBiselada(0.11, 0.07, 0.13, 0.015), COLOR_LRV.blanco, { p: base });
+    l.pieza(new THREE.CylinderGeometry(0.03, 0.045, 0.06, 12), COLOR_LRV.gris, { p: [0, base[1] + 0.06, base[2] - 0.005] });
+  });
   parte('mando', () => {
     palanca.pieza(tuboEntre(base, cima, 0.016, 8, false), COLOR_LRV.blanco);
     palanca.pieza(tuboEntre([-0.075, cima[1], cima[2]], [0.075, cima[1], cima[2]], 0.018, 8), COLOR_LRV.blanco);
@@ -629,7 +671,7 @@ function mandos(l: Lote, palanca: Lote, consola: Lote): void {
     // Placa del interruptor de marcha atrás, en el tubo y por detrás.
     const y = base[1] + 0.72 * (cima[1] - base[1]);
     const z = base[2] + 0.72 * (cima[2] - base[2]) + 0.022;
-    palanca.pieza(new THREE.BoxGeometry(0.04, 0.05, 0.008), COLOR_LRV.negro, { p: [0, y, z - 0.004], r: [0.2, 0, 0] });
+    parte('placaInterruptor', () => palanca.pieza(new THREE.BoxGeometry(0.04, 0.05, 0.008), COLOR_LRV.negro, { p: [0, y, z - 0.004], r: [0.2, 0, 0] }));
   });
   parte('consola', () => consolaPiezas(consola));
 }
@@ -646,34 +688,42 @@ const GRUPOS_INTERRUPTORES: readonly { parte: string; columnas: readonly number[
 ];
 
 function consolaPiezas(l: Lote): void {
-  varilla(l, BASE_CONSOLA, [0, 0.98, -0.62], 0.024, COLOR_LRV.gris, 10);
-  for (const s of [-1, 1]) varilla(l, [s * 0.12, Y_BASTIDOR + 0.02, -0.5], [s * 0.05, 0.9, -0.6], 0.01, COLOR_LRV.gris, 6);
+  parte('consolaSoporte', () => {
+    varilla(l, BASE_CONSOLA, [0, 0.98, -0.62], 0.024, COLOR_LRV.gris, 10);
+    for (const s of [-1, 1]) varilla(l, [s * 0.12, Y_BASTIDOR + 0.02, -0.5], [s * 0.05, 0.9, -0.6], 0.01, COLOR_LRV.gris, 6);
+  });
   l.en([0, 1.05, -0.63], [-0.3, 0, 0], () => {
     // Carcasa blanca facetada, más ancha atrás.
     l.pieza(cajaBiselada(0.44, 0.36, 0.12, 0.03), COLOR_LRV.blanco, { p: [0, 0, -0.04], v: 0.04 });
     // Panel beige con los instrumentos, hacia el conductor.
-    l.pieza(new THREE.BoxGeometry(0.38, 0.3, 0.012), COLOR_LRV.panel, { p: [0, 0, 0.026] });
-    l.pieza(new THREE.CylinderGeometry(0.06, 0.06, 0.01, 16), COLOR_LRV.banderaBlanco, { p: [-0.09, 0.07, 0.034], r: [Math.PI / 2, 0, 0] });
-    l.pieza(new THREE.TorusGeometry(0.062, 0.008, 4, 16), COLOR_LRV.negro, { p: [-0.09, 0.07, 0.038] });
-    l.pieza(new THREE.BoxGeometry(0.004, 0.05, 0.004), COLOR_LRV.negro, { p: [-0.09, 0.08, 0.04], r: [0, 0, 0.5] });
-    l.pieza(new THREE.CylinderGeometry(0.03, 0.03, 0.01, 12), COLOR_LRV.negro, { p: [0.08, 0.1, 0.034], r: [Math.PI / 2, 0, 0] });
-    for (const x of [0.03, 0.13]) l.pieza(new THREE.BoxGeometry(0.035, 0.08, 0.01), COLOR_LRV.negro, { p: [x, -0.01, 0.034] });
+    parte('consolaPanel', () => l.pieza(new THREE.BoxGeometry(0.38, 0.3, 0.012), COLOR_LRV.panel, { p: [0, 0, 0.026] }));
+    parte('consolaInstrumento', () => {
+      l.pieza(new THREE.CylinderGeometry(0.06, 0.06, 0.01, 16), COLOR_LRV.banderaBlanco, { p: [-0.09, 0.07, 0.034], r: [Math.PI / 2, 0, 0] });
+      l.pieza(new THREE.TorusGeometry(0.062, 0.008, 4, 16), COLOR_LRV.negro, { p: [-0.09, 0.07, 0.038] });
+      l.pieza(new THREE.BoxGeometry(0.004, 0.05, 0.004), COLOR_LRV.negro, { p: [-0.09, 0.08, 0.04], r: [0, 0, 0.5] });
+      l.pieza(new THREE.CylinderGeometry(0.03, 0.03, 0.01, 12), COLOR_LRV.negro, { p: [0.08, 0.1, 0.034], r: [Math.PI / 2, 0, 0] });
+      for (const x of [0.03, 0.13]) l.pieza(new THREE.BoxGeometry(0.035, 0.08, 0.01), COLOR_LRV.negro, { p: [x, -0.01, 0.034] });
+    });
     for (let fila = 0; fila < 2; fila++) {
       for (let k = 0; k < 8; k++) {
         const pieza = (): void => l.pieza(new THREE.BoxGeometry(0.01, 0.01, 0.022), COLOR_LRV.negro, { p: [-0.14 + k * 0.04, -0.09 - fila * 0.04, 0.04], r: [0.4, 0, 0] });
         const grupo = GRUPOS_INTERRUPTORES.find((g) => g.columnas.includes(k));
         if (fila === 1 && grupo) parte(grupo.parte, pieza);
-        else pieza();
+        else parte('consolaInterruptor', pieza);
       }
     }
     // Empuñaduras negras a los lados del panel.
     for (const s of [-1, 1]) {
-      varilla(l, [s * 0.24, -0.12, 0.02], [s * 0.24, 0.05, 0.02], 0.012, COLOR_LRV.gris, 8);
-      l.pieza(new THREE.CylinderGeometry(0.022, 0.022, 0.12, 10), COLOR_LRV.negro, { p: [s * 0.24, 0.12, 0.02] });
+      parte('consolaEmpunadura', () => {
+        varilla(l, [s * 0.24, -0.12, 0.02], [s * 0.24, 0.05, 0.02], 0.012, COLOR_LRV.gris, 8);
+        l.pieza(new THREE.CylinderGeometry(0.022, 0.022, 0.12, 10), COLOR_LRV.negro, { p: [s * 0.24, 0.12, 0.02] });
+      });
     }
     // Dispositivo de sombra solar encima del panel.
-    l.pieza(new THREE.BoxGeometry(0.08, 0.04, 0.05), COLOR_LRV.blanco, { p: [0, 0.2, -0.02] });
-    l.pieza(new THREE.BoxGeometry(0.004, 0.05, 0.004), COLOR_LRV.negro, { p: [0, 0.235, -0.02] });
+    parte('sombraSolar', () => {
+      l.pieza(new THREE.BoxGeometry(0.08, 0.04, 0.05), COLOR_LRV.blanco, { p: [0, 0.2, -0.02] });
+      l.pieza(new THREE.BoxGeometry(0.004, 0.05, 0.004), COLOR_LRV.negro, { p: [0, 0.235, -0.02] });
+    });
   });
 }
 
@@ -684,7 +734,8 @@ function cable(l: Lote, a: V3, b: V3, comba: number, color: number = COLOR_LRV.g
   for (let i = 1; i <= tramos; i++) {
     const t = i / tramos;
     const actual: V3 = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t - comba * 4 * t * (1 - t), a[2] + (b[2] - a[2]) * t];
-    l.pieza(tuboEntre(previo, actual, 0.007, 5, false), color);
+    const desde = previo;
+    parte('cable', () => l.pieza(tuboEntre(desde, actual, 0.007, 5, false), color));
     previo = actual;
   }
 }
@@ -733,24 +784,26 @@ function equipos(l: Lote, carga: { delantera: Lote; trasera: Lote }, haciaTierra
   parte('baterias', () => {
     for (const x of [-0.28, 0.28]) cajaCinchada(l, [x, y + 0.1, -0.92], 0.44, 0.18, 0.42);
   });
-  cajaCinchada(l, [0, y + 0.08, -1.3], 0.9, 0.13, 0.3);
+  parte('electronica', () => cajaCinchada(l, [0, y + 0.08, -1.3], 0.9, 0.13, 0.3));
   cable(l, [0.02, 0.95, -0.6], [0.1, y + 0.15, -1.15], 0.08);
   cable(l, [-0.28, y + 0.2, -0.72], [-0.18, y + 0.14, -1.16], 0.03);
   cable(l, [0.28, y + 0.2, -0.72], [0.2, y + 0.14, -1.16], 0.03);
   // Lo que sigue se montó en la Luna, después del despliegue.
   l = carga.delantera;
   // Unidad de comunicaciones (LCRU) forrada de lámina dorada, con su asa y su panel de mando.
-  parte('mylar', () => cajaDorada(l, [0, y + 0.3, -1.38], 0.56, 0.24, 0.36, 41));
-  l.pieza(tuboEntre([-0.2, y + 0.45, -1.56], [0.2, y + 0.45, -1.56], 0.01, 6), COLOR_LRV.gris);
-  l.pieza(new THREE.BoxGeometry(0.3, 0.12, 0.012), COLOR_LRV.negro, { p: [0.08, y + 0.3, -1.565] });
+  parte('mylar', () => parte('lcru', () => cajaDorada(l, [0, y + 0.3, -1.38], 0.56, 0.24, 0.36, 41)));
+  parte('asaLCRU', () => l.pieza(tuboEntre([-0.2, y + 0.45, -1.56], [0.2, y + 0.45, -1.56], 0.01, 6), COLOR_LRV.gris));
+  parte('panelLCRU', () => l.pieza(new THREE.BoxGeometry(0.3, 0.12, 0.012), COLOR_LRV.negro, { p: [0.08, y + 0.3, -1.565] }));
   // Cámara de televisión en color (GCTA) forrada de lámina dorada, sobre su pedestal dorado y la unidad de control
   // blanca, mirando hacia delante.
   parte('camaraTV', () => {
-    parte('mylar', () => cajaDorada(l, [0.1, y + 0.62, -1.42], 0.12, 0.26, 0.12, 43));
-    l.pieza(cajaBiselada(0.14, 0.1, 0.12, 0.012), COLOR_LRV.blanco, { p: [0.1, y + 0.5, -1.42] });
-    parte('mylar', () => cajaDorada(l, [0.1, y + 0.82, -1.46], 0.14, 0.13, 0.3, 47));
-    l.pieza(new THREE.CylinderGeometry(0.035, 0.04, 0.07, 12), COLOR_LRV.negro, { p: [0.1, y + 0.82, -1.64], r: [Math.PI / 2, 0, 0] });
-    l.pieza(new THREE.CylinderGeometry(0.028, 0.028, 0.004, 12), COLOR_LRV.lente, { p: [0.1, y + 0.82, -1.676], r: [Math.PI / 2, 0, 0] });
+    parte('mylar', () => parte('camaraPedestal', () => cajaDorada(l, [0.1, y + 0.62, -1.42], 0.12, 0.26, 0.12, 43)));
+    parte('camaraControl', () => l.pieza(cajaBiselada(0.14, 0.1, 0.12, 0.012), COLOR_LRV.blanco, { p: [0.1, y + 0.5, -1.42] }));
+    parte('mylar', () => parte('camaraCuerpo', () => cajaDorada(l, [0.1, y + 0.82, -1.46], 0.14, 0.13, 0.3, 47)));
+    parte('camaraLente', () => {
+      l.pieza(new THREE.CylinderGeometry(0.035, 0.04, 0.07, 12), COLOR_LRV.negro, { p: [0.1, y + 0.82, -1.64], r: [Math.PI / 2, 0, 0] });
+      l.pieza(new THREE.CylinderGeometry(0.028, 0.028, 0.004, 12), COLOR_LRV.lente, { p: [0.1, y + 0.82, -1.676], r: [Math.PI / 2, 0, 0] });
+    });
   });
   cable(l, [0.16, y + 0.5, -1.36], [0.2, y + 0.38, -1.25], 0.03);
   cable(l, [0.04, y + 0.5, -1.36], [-0.1, y + 0.42, -1.25], 0.03);
@@ -764,12 +817,12 @@ function equipos(l: Lote, carga: { delantera: Lote; trasera: Lote }, haciaTierra
   cable(l, [-0.15, y + 0.42, -1.25], [-0.3, y + 0.62, -1.3], 0.04);
   cable(l, [0.15, y + 0.42, -1.25], [0.31, y + 0.62, -1.32], 0.04);
   // Portaherramientas trasero: bastidor blanco perforado con las cajas de muestras y las pinzas de pie.
-  portaherramientas(carga.trasera, y);
+  parte('portaherramientas', () => portaherramientas(carga.trasera, y));
 }
 
 /** Antena de alta ganancia en su mástil, con el paraguas hacia `haciaTierraLocal`. */
 function antenaAlta(l: Lote, y: number, cimaMastil: V3, haciaTierraLocal: THREE.Vector3): void {
-  varilla(l, [-0.3, y + 0.3, -1.3], cimaMastil, 0.014, COLOR_LRV.gris, 10);
+  parte('antenaMastil', () => varilla(l, [-0.3, y + 0.3, -1.3], cimaMastil, 0.014, COLOR_LRV.gris, 10));
   const giro = new THREE.Euler().setFromQuaternion(
     new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), haciaTierraLocal.clone().normalize()),
   );
@@ -778,7 +831,7 @@ function antenaAlta(l: Lote, y: number, cimaMastil: V3, haciaTierraLocal: THREE.
     const radios = [0.04, 0.18, 0.32, RADIO_ANTENA_ALTA];
     const perfil = radios.map((r) => new THREE.Vector2(r, fondo * (r / RADIO_ANTENA_ALTA) ** 2));
     // Malla en gajos entre las varillas: un polígono de NERVADURAS_ANTENA lados (facetado, como el real).
-    l.pieza(new THREE.LatheGeometry(perfil, NERVADURAS_ANTENA), COLOR_LRV.grisMalla, { m: 'rejilla' });
+    parte('antenaMalla', () => l.pieza(new THREE.LatheGeometry(perfil, NERVADURAS_ANTENA), COLOR_LRV.grisMalla, { m: 'rejilla' }));
     for (let k = 0; k < NERVADURAS_ANTENA; k++) {
       const a = (k / NERVADURAS_ANTENA) * Math.PI * 2;
       const c = Math.cos(a);
@@ -786,18 +839,22 @@ function antenaAlta(l: Lote, y: number, cimaMastil: V3, haciaTierraLocal: THREE.
       for (let j = 0; j < perfil.length - 1; j++) {
         const p0 = perfil[j];
         const p1 = perfil[j + 1];
-        varilla(l, [c * p0.x, p0.y + 0.003, sn * p0.x], [c * p1.x, p1.y + 0.003, sn * p1.x], 0.005, COLOR_LRV.gris, 4);
+        parte('antenaNervadura', () => varilla(l, [c * p0.x, p0.y + 0.003, sn * p0.x], [c * p1.x, p1.y + 0.003, sn * p1.x], 0.005, COLOR_LRV.gris, 4));
       }
     }
     // Cubo dentado en el centro y la varilla de apuntado con su alimentador.
-    l.pieza(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 12), COLOR_LRV.negro, { p: [0, 0.01, 0] });
-    for (let k = 0; k < 12; k++) {
-      const a = (k / 12) * Math.PI * 2;
-      l.pieza(new THREE.BoxGeometry(0.03, 0.035, 0.03), COLOR_LRV.negro, { p: [Math.cos(a) * 0.08, 0.01, Math.sin(a) * 0.08], r: [0, -a, 0] });
-    }
-    varilla(l, [0, -0.35, 0], [0, 0.36, 0], 0.012, COLOR_LRV.gris, 8);
-    l.pieza(new THREE.CylinderGeometry(0.04, 0.03, 0.05, 10), COLOR_LRV.gris, { p: [0, 0.36, 0] });
-    l.pieza(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 8), COLOR_LRV.negro, { p: [0, -0.38, 0] });
+    parte('antenaCubo', () => {
+      l.pieza(new THREE.CylinderGeometry(0.07, 0.07, 0.04, 12), COLOR_LRV.negro, { p: [0, 0.01, 0] });
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2;
+        l.pieza(new THREE.BoxGeometry(0.03, 0.035, 0.03), COLOR_LRV.negro, { p: [Math.cos(a) * 0.08, 0.01, Math.sin(a) * 0.08], r: [0, -a, 0] });
+      }
+    });
+    parte('antenaAlimentador', () => {
+      varilla(l, [0, -0.35, 0], [0, 0.36, 0], 0.012, COLOR_LRV.gris, 8);
+      l.pieza(new THREE.CylinderGeometry(0.04, 0.03, 0.05, 10), COLOR_LRV.gris, { p: [0, 0.36, 0] });
+      l.pieza(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 8), COLOR_LRV.negro, { p: [0, -0.38, 0] });
+    });
   });
 }
 
@@ -805,8 +862,10 @@ function antenaBaja(l: Lote, y: number): void {
   const p0: V3 = [0.3, y + 0.35, -1.32];
   const p1: V3 = [0.32, 1.25, -1.34];
   const p2: V3 = [0.42, 1.45, -1.3];
-  varilla(l, p0, p1, 0.012, COLOR_LRV.gris, 8);
-  varilla(l, p1, p2, 0.012, COLOR_LRV.gris, 8);
+  parte('antenaMastil', () => {
+    varilla(l, p0, p1, 0.012, COLOR_LRV.gris, 8);
+    varilla(l, p1, p2, 0.012, COLOR_LRV.gris, 8);
+  });
   l.en(p2, [0.3, 0, -0.7], () => {
     l.pieza(new THREE.CylinderGeometry(0.035, 0.035, 0.28, 12), COLOR_LRV.blanco, { p: [0, 0.1, 0] });
     for (let k = 0; k < 14; k++) {
@@ -822,22 +881,28 @@ function antenaBaja(l: Lote, y: number): void {
 
 function portaherramientas(l: Lote, y: number): void {
   const zp = 1.2;
-  l.pieza(cajaBiselada(1.0, 0.5, 0.56, 0.02), COLOR_LRV.blanco, { p: [0, y + 0.3, zp], v: 0.04 });
+  parte('portaCaja', () => l.pieza(cajaBiselada(1.0, 0.5, 0.56, 0.02), COLOR_LRV.blanco, { p: [0, y + 0.3, zp], v: 0.04 }));
   for (let k = 0; k < 4; k++) {
-    l.pieza(new THREE.CylinderGeometry(0.05, 0.05, 0.012, 12), COLOR_LRV.negro, { p: [-0.33 + k * 0.22, y + 0.556, zp + 0.12], v: 0.02 });
-    l.pieza(new THREE.CylinderGeometry(0.04, 0.04, 0.012, 10), COLOR_LRV.negro, { p: [-0.33 + k * 0.22, y + 0.3, zp - 0.282], r: [Math.PI / 2, 0, 0] });
+    parte('portaPerforacion', () => {
+      l.pieza(new THREE.CylinderGeometry(0.05, 0.05, 0.012, 12), COLOR_LRV.negro, { p: [-0.33 + k * 0.22, y + 0.556, zp + 0.12], v: 0.02 });
+      l.pieza(new THREE.CylinderGeometry(0.04, 0.04, 0.012, 10), COLOR_LRV.negro, { p: [-0.33 + k * 0.22, y + 0.3, zp - 0.282], r: [Math.PI / 2, 0, 0] });
+    });
   }
-  for (const x of [-0.25, 0.25]) l.pieza(cajaBiselada(0.4, 0.22, 0.42, 0.03), COLOR_LRV.blanco, { p: [x, y + 0.66, zp + 0.02], v: 0.08 });
-  for (const x of [-0.5, 0.5]) varilla(l, [x, y + 0.05, zp - 0.28], [x, y + 0.8, zp - 0.28], 0.014, COLOR_LRV.blanco, 6);
-  varilla(l, [-0.5, y + 0.8, zp - 0.28], [0.5, y + 0.8, zp - 0.28], 0.014, COLOR_LRV.blanco, 6);
+  for (const x of [-0.25, 0.25]) parte('cajaMuestras', () => l.pieza(cajaBiselada(0.4, 0.22, 0.42, 0.03), COLOR_LRV.blanco, { p: [x, y + 0.66, zp + 0.02], v: 0.08 }));
+  parte('portaMarco', () => {
+    for (const x of [-0.5, 0.5]) varilla(l, [x, y + 0.05, zp - 0.28], [x, y + 0.8, zp - 0.28], 0.014, COLOR_LRV.blanco, 6);
+    varilla(l, [-0.5, y + 0.8, zp - 0.28], [0.5, y + 0.8, zp - 0.28], 0.014, COLOR_LRV.blanco, 6);
+  });
   // Pinzas (dos), de pie a la izquierda del portaherramientas, con su soporte.
   for (const dz of [-0.06, 0.06]) {
     const xt = -0.42;
-    varilla(l, [xt, y + 0.35, zp + dz + 0.2], [xt, y + 1.2, zp + dz + 0.2], 0.012, COLOR_LRV.gris, 8);
-    for (const s of [-1, 1]) varilla(l, [xt + s * 0.012, y + 1.2, zp + dz + 0.2], [xt + s * 0.03, y + 1.32, zp + dz + 0.2], 0.008, COLOR_LRV.gris, 6);
-    l.pieza(new THREE.CylinderGeometry(0.02, 0.02, 0.08, 8), COLOR_LRV.negro, { p: [xt, y + 0.9, zp + dz + 0.2] });
+    parte('pinzas', () => {
+      varilla(l, [xt, y + 0.35, zp + dz + 0.2], [xt, y + 1.2, zp + dz + 0.2], 0.012, COLOR_LRV.gris, 8);
+      for (const s of [-1, 1]) varilla(l, [xt + s * 0.012, y + 1.2, zp + dz + 0.2], [xt + s * 0.03, y + 1.32, zp + dz + 0.2], 0.008, COLOR_LRV.gris, 6);
+      l.pieza(new THREE.CylinderGeometry(0.02, 0.02, 0.08, 8), COLOR_LRV.negro, { p: [xt, y + 0.9, zp + dz + 0.2] });
+    });
   }
-  l.pieza(new THREE.BoxGeometry(0.08, 0.1, 0.22), COLOR_LRV.blanco, { p: [-0.42, y + 0.6, zp + 0.2] });
+  parte('pinzas', () => l.pieza(new THREE.BoxGeometry(0.08, 0.1, 0.22), COLOR_LRV.blanco, { p: [-0.42, y + 0.6, zp + 0.2] }));
 }
 
 /** Color del polvo lunar que se pega a la parte baja del LRV: el gris del regolito. */
@@ -1112,4 +1177,61 @@ function construirLRV(haciaTierraLocal: THREE.Vector3): THREE.Group {
     o.receiveShadow = true;
   });
   return grupo;
+}
+
+/**
+ * Una pieza suelta del LRV para el taller 3D: su geometría va centrada en su propio centro (`centro`, en ejes del LRV
+ * desplegado) para poder moverla sola.
+ */
+export interface PiezaLRV {
+  /** Posición en la lista. */
+  indice: number;
+  /** Clase de pieza: la `parte()` más específica con la que se construyó, o 'sinNombre'. */
+  clave: string;
+  /** Todas las partes a las que pertenece (la más general primero). */
+  partes: string[];
+  acabado: PiezaCapturada['acabado'];
+  geo: THREE.BufferGeometry;
+  centro: THREE.Vector3;
+  /** Radio de la esfera que envuelve la pieza (m). */
+  radio: number;
+}
+
+/**
+ * Construye el LRV desplegado como una lista de piezas sueltas: cada primitiva del modelo (cada perno, tubo, panel,
+ * cinta de malla…) es una pieza. Es el mismo modelo que se conduce, solo que sin fusionar. Un LRV nuevo en cada llamada.
+ */
+export function crearPiezasLRV(): PiezaLRV[] {
+  const haciaTierra = new THREE.Vector3(0.25, 0.8, -0.55);
+  const grupo = capturandoPiezas(() => construirLRV(haciaTierra));
+  (grupo.userData.plegado as PlegadoLRV).aplicar(POSE_DESPLEGADO);
+  grupo.updateMatrixWorld(true);
+  const lista: PiezaLRV[] = [];
+  const esfera = new THREE.Sphere();
+  grupo.traverse((o) => {
+    const piezas = o.userData.piezas as PiezaCapturada[] | undefined;
+    if (!piezas) return;
+    for (const p of piezas) {
+      p.geo.applyMatrix4(o.matrixWorld);
+      p.geo.computeBoundingBox();
+      const centro = p.geo.boundingBox!.getCenter(new THREE.Vector3());
+      p.geo.translate(-centro.x, -centro.y, -centro.z);
+      p.geo.computeBoundingSphere();
+      esfera.copy(p.geo.boundingSphere!);
+      lista.push({
+        indice: lista.length,
+        clave: p.partes[p.partes.length - 1] ?? 'sinNombre',
+        partes: p.partes,
+        acabado: p.acabado,
+        geo: p.geo,
+        centro,
+        radio: esfera.radius,
+      });
+    }
+  });
+  // Las mallas fusionadas del modelo normal ya no hacen falta.
+  grupo.traverse((o) => {
+    if (o instanceof THREE.Mesh) o.geometry.dispose();
+  });
+  return lista;
 }

@@ -196,12 +196,24 @@ export class MisionLuna {
    * bajarse; sí puede mirar alrededor y aplaudir para volver al museo.
    */
   private bloqueadaMision = false;
+  /** Exploración libre (ver el constructor). */
+  private readonly libre: boolean;
 
   /**
    * `estadoInicial` por defecto es `entrando_museo`: la escena se abre con el aplauso de la vitrina
    * (lo gestiona Museo) y el jugador llega a pie. Un aplauso junto al LRV lo sienta.
    */
-  constructor(estadoInicial: EstadoLuna = 'entrando_museo', posicion = POSICION_LRV_INICIAL, rumbo = RUMBO_LRV_INICIAL) {
+  constructor(
+    estadoInicial: EstadoLuna = 'entrando_museo',
+    posicion = POSICION_LRV_INICIAL,
+    rumbo = RUMBO_LRV_INICIAL,
+    /**
+     * Exploración libre: solo el LRV en la Luna. No hay roca, ni halo, ni misión que cumplir, y el LM no existe (no
+     * estorba ni limita el paso). Opcional: false.
+     */
+    libre = false,
+  ) {
+    this.libre = libre;
     this.estadoActual = estadoInicial;
     this.x = posicion.x;
     this.z = posicion.z;
@@ -277,12 +289,12 @@ export class MisionLuna {
 
   /** El LRV está lo bastante cerca para golpear la roca: a `DISTANCIA_ROCA_M` o menos (SPEC 8.3). */
   get rocaResaltada(): boolean {
-    return this.distanciaRoca() <= DISTANCIA_ROCA_M;
+    return !this.libre && this.distanciaRoca() <= DISTANCIA_ROCA_M;
   }
 
   /** El halo de la roca se ve desde que se llega hasta recoger la muestra (SPEC 10: visible hasta completar la acción). */
   get haloVisible(): boolean {
-    return !this.conMuestra && this.estadoActual !== 'volviendo';
+    return !this.libre && !this.conMuestra && this.estadoActual !== 'volviendo';
   }
 
   /** Avanza un fotograma. Devuelve los eventos ocurridos en él. */
@@ -393,9 +405,9 @@ export class MisionLuna {
     // Solo se bloquea el paso que entra en el LM o sale del radio: alejarse o volver siempre se puede.
     const desdeLM = Math.hypot(x - LM.x, z - LM.z);
     const antes = Math.hypot(this.x - LM.x, this.z - LM.z);
-    if ((desdeLM < DISTANCIA_MINIMA_LM_M && desdeLM < antes) || (desdeLM > RADIO_LRV_M && desdeLM > antes)) return;
+    if ((desdeLM < DISTANCIA_MINIMA_LM_M && desdeLM < antes && !this.libre) || (desdeLM > RADIO_LRV_M && desdeLM > antes)) return;
     const aRoca = Math.hypot(x - POSICION_ROCA.x, z - POSICION_ROCA.z);
-    if (aRoca < DISTANCIA_MINIMA_ROCA_M && aRoca < this.distanciaRoca()) return;
+    if (aRoca < DISTANCIA_MINIMA_ROCA_M && aRoca < this.distanciaRoca() && !this.libre) return;
     this.x = x;
     this.z = z;
   }

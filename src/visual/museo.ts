@@ -35,6 +35,7 @@ import {
 } from './sitioApollo17';
 import { crearDespegueLM, type DespegueLM, type EstadoDespegueVisual } from './despegueLM';
 import { crearHuellasLRV, type HuellasLRV } from './huellasLRV';
+import { crearTallerVisual, type TallerVisual } from './tallerLRV';
 import { crearPresentacionVisual, type EstadoPresentacionVisual, type PosicionMarca, type PresentacionVisual } from './presentacionLRV';
 
 // Toda la parte visual del museo (Three.js). La lógica de juego solo llama a `visual.museo`.
@@ -192,6 +193,12 @@ let enMuseo = true;
 let presentacion: PresentacionVisual | null = null;
 /** true mientras se ve la presentación: se dibuja ella en vez del museo o la misión. */
 let enPresentacion = false;
+/** Taller 3D del LRV (tallerLRV.ts): se crea la primera vez que se entra y se reutiliza. */
+let taller: TallerVisual | null = null;
+/** true mientras se ve el taller: se dibuja él en vez del museo o la misión. */
+let enTaller = false;
+/** Modo "exploración libre" de la Luna: sin módulo lunar (ni su obstáculo), solo el LRV. */
+let lunaLibre = false;
 /** Cinemática del despegue del LM (despegueLM.ts), o null si no se pudo montar. */
 let despegue: DespegueLM | null = null;
 /** true mientras se ve la cinemática: la cámara la lleva ella, no el jugador. */
@@ -340,6 +347,7 @@ async function iniciar(container: HTMLElement): Promise<void> {
     post.ajustar(width, height);
     postLuna?.ajustar(width, height);
     presentacion?.ajustar(width, height);
+    taller?.ajustar(width, height);
     anchoVista = width;
     altoVista = height;
     camaraNueva.aspect = width / height;
@@ -354,6 +362,10 @@ async function iniciar(container: HTMLElement): Promise<void> {
     const t = reloj.getElapsedTime();
     const dt = Math.min(t - tPrevio, 0.1);
     tPrevio = t;
+    if (enTaller && taller) {
+      taller.render(dt);
+      return;
+    }
     if (enPresentacion && presentacion) {
       presentacion.render();
       return;
@@ -576,7 +588,7 @@ function moverEnLuna(dx: number, dy: number, dLateral: number): void {
       posicion.z = cz + (ez / d) * radio;
     }
   };
-  apartar(LM.x, LM.z, RADIO_OBSTACULO_LM_M);
+  if (!lunaLibre) apartar(LM.x, LM.z, RADIO_OBSTACULO_LM_M);
   if (lrvLuna) apartar(lrvLuna.position.x, lrvLuna.position.z, RADIO_OBSTACULO_LRV_M);
   const radio = Math.hypot(posicion.x - LM.x, posicion.z - LM.z);
   if (radio > RADIO_LRV_M) {
@@ -835,6 +847,40 @@ function entrarPresentacion(): boolean {
   return true;
 }
 
+/**
+ * Pasa al taller 3D del LRV: fondo blanco y el vehículo desarmable (tallerLRV.ts). Devuelve el taller, o null si no se
+ * pudo montar (entonces el juego sigue sin él).
+ */
+function entrarTaller(): TallerVisual | null {
+  if (!rendererPrincipal) return null;
+  try {
+    taller ??= crearTallerVisual(rendererPrincipal);
+  } catch (err) {
+    console.error('No se pudo montar el taller 3D del LRV', err);
+    taller = null;
+    return null;
+  }
+  taller.reiniciar();
+  taller.ajustar(anchoVista, altoVista);
+  taller.activar();
+  rendererPrincipal.toneMapping = THREE.NoToneMapping;
+  rendererPrincipal.toneMappingExposure = 1;
+  manosAvatar?.ocultar();
+  enTaller = true;
+  return taller;
+}
+
+/** Sale del taller: vuelve a dibujarse el museo o la misión. */
+function salirTaller(): void {
+  if (!enTaller) return;
+  enTaller = false;
+  taller?.desactivar();
+  if (rendererPrincipal) {
+    rendererPrincipal.toneMapping = THREE.ACESFilmicToneMapping;
+    rendererPrincipal.toneMappingExposure = enMuseo ? EXPOSICION : EXPOSICION_LUNA;
+  }
+}
+
 /** Un fotograma de la presentación. Devuelve la posición en pantalla de las piezas de cada marca del tramo. */
 function actualizarPresentacion(estado: EstadoPresentacionVisual): PosicionMarca[] {
   if (!enPresentacion || !presentacion) return [];
@@ -928,6 +974,18 @@ function terminarDespegue(): void {
   moverEnLuna(0, 0, 0);
 }
 
+/**
+ * Exploración libre de la Luna: sin módulo lunar, sin la roca y sin su suelo naranja; solo el terreno y el LRV. Con false
+ * (la misión de siempre) todo vuelve. Se llama antes de entrar a la Luna.
+ */
+function fijarLunaLibre(libre: boolean): void {
+  lunaLibre = libre;
+  const lm = nodos.get('escena_luna')?.getObjectByName('lm_challenger');
+  if (lm) lm.visible = !libre;
+  if (rocaLuna) rocaLuna.visible = !libre;
+  if (haloRoca && libre) haloRoca.visible = false;
+}
+
 /** Oculta las dos manos del avatar, por ejemplo si el seguimiento se ha perdido (SPEC 6). */
 function ocultarManos(): void {
   manosAvatar?.ocultar();
@@ -955,6 +1013,9 @@ export const visual = {
     volverAlMuseo,
     entrarPresentacion,
     actualizarPresentacion,
+    entrarTaller,
+    salirTaller,
+    fijarLunaLibre,
     iniciarDespegue,
     actualizarDespegue,
     terminarDespegue,
