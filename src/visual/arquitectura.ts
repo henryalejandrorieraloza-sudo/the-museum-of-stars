@@ -659,7 +659,7 @@ function pedestalEnLote(l: Lote, o: OpcionesPedestal): void {
 // ---------------------------------------------------------------------------
 
 /** Mundo que muestran las imágenes de una instalación: donde trabajó el artefacto. */
-export type TemaInstalacion = 'luna' | 'marte' | 'saturno';
+export type TemaInstalacion = 'luna' | 'saturno';
 
 interface ColoresTema {
   cielo: number;
@@ -676,7 +676,6 @@ interface ColoresTema {
 /** Colores aproximados de cada mundo. Las imágenes son paisajes genéricos, no fotos ni lugares concretos. */
 const TEMAS: Record<TemaInstalacion, ColoresTema> = {
   luna: { cielo: 0x04050a, cieloBajo: 0x090b12, suelo: 0x8f8c86, sueloLejos: 0x6c6a66, roca: 0x4a4845, astro: 0x3d7fd6, vehiculo: true },
-  marte: { cielo: 0xc29870, cieloBajo: 0xd8b48c, suelo: 0xa4532c, sueloLejos: 0x7f3d22, roca: 0x5a2a18, astro: null, vehiculo: true },
   // Titán, donde se posó Huygens: neblina naranja y suelo pardo con guijarros claros de hielo.
   saturno: { cielo: 0xb5743a, cieloBajo: 0xcf9152, suelo: 0x7a5530, sueloLejos: 0x5f4328, roca: 0xb9a084, astro: null, vehiculo: false },
 };

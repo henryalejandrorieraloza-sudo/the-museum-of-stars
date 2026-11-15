@@ -21,7 +21,7 @@ import { DURACION_DESPLIEGUE_LRV_S } from './despliegueApollo17';
 import { crearDespliegueLRV, type DespliegueVisualLRV } from './despliegueLRV';
 import { crearManos, type ManoDetectada, type ManosAvatar, type OpcionesManos } from './manos';
 import { ARQ } from './paleta';
-import { crearCassiniExhibicion, crearLRVExhibicion, crearPerseveranceExhibicion } from './props';
+import { crearCassiniExhibicion, crearLRVExhibicion } from './props';
 import {
   LLEGADA,
   LM,
@@ -40,8 +40,7 @@ import { crearPresentacionVisual, type EstadoPresentacionVisual, type PosicionMa
 // Toda la parte visual del museo (Three.js). La lógica de juego solo llama a `visual.museo`.
 // Convención de ejes: X a la derecha, Y arriba (metros), −Z hacia donde mira la cámara al inicio.
 // Estilo del museo: ver spec-visual-museo.md. La sala y sus objetos están en arquitectura.ts y props.ts, y las luces,
-// la niebla, el fondo y el bloom en ambiente.ts. La escena lunar (Apollo 17) está en lunaEscena.ts y sus módulos;
-// la de Marte, en este archivo, conserva su aspecto provisional.
+// la niebla, el fondo y el bloom en ambiente.ts. La escena lunar (Apollo 17) está en lunaEscena.ts y sus módulos.
 
 /** Altura de los ojos del jugador (m). */
 const ALTURA_OJOS = 1.6;
@@ -52,9 +51,7 @@ const INICIO = { x: 0, z: 11 };
  * centro del LRV (m): justo fuera de RADIO_OBSTACULO_LRV_M, para no rebotar contra él al dar el primer paso.
  */
 const DISTANCIA_BAJADA_LRV_M = RADIO_OBSTACULO_LRV_M + 0.3;
-/** Límite de movimiento en Marte (m, por eje). En el museo manda RADIO_CAMINABLE y en la Luna, RADIO_LRV_M. */
-const LIMITE_MISION_X_Z = 7.4;
-/** Plano lejano de la cámara en el museo y en Marte (m). En la Luna se amplía a LEJANO_CAMARA_LUNA_M. */
+/** Plano lejano de la cámara en el museo (m). En la Luna se amplía a LEJANO_CAMARA_LUNA_M. */
 const LEJANO_CAMARA_M = 100;
 /** Sentado en el LRV, cuánto puede girar la vista a cada lado del rumbo (rad). */
 const LIMITE_MIRADA_LRV = THREE.MathUtils.degToRad(100);
@@ -62,14 +59,11 @@ const LIMITE_MIRADA_LRV = THREE.MathUtils.degToRad(100);
 const LIMITE_CABECEO = THREE.MathUtils.degToRad(35);
 
 /**
- * Centro de cada vitrina de artefacto (base sobre el suelo). LRV y Perseverance, a unos 9 m del inicio y a 9 m entre
- * sí; Cassini, al fondo de la sala entre los dos cohetes, con la pared oscura detrás (el cohete central, blanco y
- * muy iluminado, no deja leer un holograma que tenga delante).
+ * Centro de cada vitrina de artefacto (base sobre el suelo). LRV y Cassini, a unos 9 m del inicio y a 9 m entre sí.
  */
 const POSICION_VITRINA: Record<string, { x: number; z: number }> = {
   vitrina_lrv: { x: -4.5, z: 3 },
-  vitrina_perseverance: { x: 4.5, z: 3 },
-  vitrina_cassini: { x: 0, z: -10.5 },
+  vitrina_cassini: { x: 4.5, z: 3 },
 };
 /** Punto al que apunta el rayo: el centro del holograma. */
 const ALTURA_PUNTO_VITRINA = ALTURA_CENTRO_EXHIBICION;
@@ -99,25 +93,9 @@ const INCLINA_MAX_MENTOR = 0.2;
 /** Ángulo máximo entre el rayo y la vitrina para considerar que la apunta. */
 const TOLERANCIA_RAD = THREE.MathUtils.degToRad(12);
 
-/** Colores del mentor, el halo y las escenas de misión. La paleta del museo está en paleta.ts. */
-const COLOR = {
-  /** Acento de Perseverance en la escena de Marte. */
-  acentoPerseverance: 0xff8a3d,
-  cieloLuna: 0x000000,
-  rueda: 0x3a3a3a,
-  sueloMarte: 0x9c4a2a,
-  cieloMarte: 0xd9e8f2,
-  /** Perseverance: cuerpo blanco y capa térmica dorada. */
-  blanco: 0xeeeeee,
-  dorado: 0xc8a24a,
-} as const;
-
 /** Escenas de misión disponibles. Coinciden con `Mision` de src/game/museo.ts. */
-export type Escena = 'luna' | 'marte';
-const NODO_ESCENA: Record<Escena, string> = { luna: 'escena_luna', marte: 'escena_marte' };
-const FONDO_ESCENA: Record<Escena, number> = { luna: COLOR.cieloLuna, marte: COLOR.cieloMarte };
-/** Punto de llegada del jugador en Marte: 4 m delante del origen, mirando a −Z. La de la Luna está en sitioApollo17.ts. */
-const LLEGADA_ESCENA = { x: 0, z: 4 };
+export type Escena = 'luna';
+const NODO_ESCENA: Record<Escena, string> = { luna: 'escena_luna' };
 
 type Constructor = () => THREE.Object3D;
 
@@ -125,78 +103,12 @@ type Constructor = () => THREE.Object3D;
 const PLACEHOLDERS: Record<string, Constructor> = {
   'placeholder:sala': crearRotonda,
   'placeholder:vitrina_lrv': () => crearInstalacionHolograma(crearLRVExhibicion, 'luna', ARQ.cian, -2.5),
-  'placeholder:vitrina_perseverance': () => crearInstalacionHolograma(crearPerseveranceExhibicion, 'marte', ARQ.ambar, 2.5, 0.85),
   'placeholder:vitrina_cassini': () => crearInstalacionHolograma(crearCassiniExhibicion, 'saturno', ARQ.magenta, 0, 0.45),
   'placeholder:mentor': crearMentor,
   'placeholder:escena_luna': crearEscenaLuna,
-  'placeholder:escena_marte': crearEscenaMarte,
 };
 
-/** Material mate con caras planas (look low poly). Sin texturas. */
-function material(color: number, extra: THREE.MeshStandardMaterialParameters = {}): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.9, flatShading: true, ...extra });
-}
 
-function caja(ancho: number, alto: number, fondo: number, color: number): THREE.Mesh {
-  return new THREE.Mesh(new THREE.BoxGeometry(ancho, alto, fondo), material(color));
-}
-
-/** Malla de una figura geométrica con posición y giro en radianes (x, y, z). */
-function malla(
-  geometria: THREE.BufferGeometry,
-  color: number,
-  posicion: [number, number, number] = [0, 0, 0],
-  giro: [number, number, number] = [0, 0, 0],
-): THREE.Mesh {
-  const objeto = new THREE.Mesh(geometria, material(color));
-  objeto.position.set(...posicion);
-  objeto.rotation.set(...giro);
-  return objeto;
-}
-
-/** Suelo plano grande (60 × 60 m) a nivel del suelo. */
-function crearSuelo(color: number): THREE.Mesh {
-  const suelo = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), material(color));
-  suelo.rotation.x = -Math.PI / 2;
-  return suelo;
-}
-
-/**
- * Perseverance aproximado, sin medidas oficiales: cuerpo blanco con capa dorada, seis ruedas,
- * mástil con cámara, generador (RTG) y brazo. Origen en el suelo, centrado. Forma simplificada: ver MODELS.md.
- */
-function crearPerseverance(acento: number = COLOR.acentoPerseverance): THREE.Object3D {
-  const grupo = new THREE.Group();
-  grupo.name = 'perseverance_placeholder';
-  const cuerpo = caja(1.3, 0.5, 1.0, COLOR.blanco);
-  cuerpo.position.y = 0.75;
-  const capa = caja(1.1, 0.06, 0.9, COLOR.dorado);
-  capa.position.y = 1.03;
-  // Franja de acento en el frente del cuerpo, para distinguirlo del LRV.
-  const franja = caja(1.32, 0.08, 0.1, acento);
-  franja.position.set(0, 0.75, 0.5);
-  grupo.add(franja);
-  const rtg = malla(new THREE.CylinderGeometry(0.2, 0.2, 0.6, 8), COLOR.dorado, [0, 0.8, 0.75], [Math.PI / 2, 0, 0]);
-  const mastil = malla(new THREE.CylinderGeometry(0.04, 0.04, 0.85, 6), COLOR.blanco, [0.35, 1.42, -0.2]);
-  const camara = malla(new THREE.IcosahedronGeometry(0.1, 0), COLOR.blanco, [0.35, 1.92, -0.2]);
-  const brazo = malla(new THREE.CylinderGeometry(0.035, 0.035, 0.9, 6), COLOR.blanco, [-0.35, 0.45, -0.85], [Math.PI / 2, 0, 0]);
-  grupo.add(cuerpo, capa, rtg, mastil, camara, brazo);
-  for (const x of [-0.75, 0.75]) {
-    for (const z of [-0.5, 0, 0.5]) {
-      grupo.add(malla(new THREE.CylinderGeometry(0.25, 0.25, 0.15, 10), COLOR.rueda, [x, 0.25, z], [0, 0, Math.PI / 2]));
-    }
-  }
-  return grupo;
-}
-
-/** Escena marciana: suelo rojizo y Perseverance aproximado. Cielo claro (fondo de la escena). */
-function crearEscenaMarte(): THREE.Object3D {
-  const grupo = new THREE.Group();
-  const perseverance = crearPerseverance();
-  perseverance.position.set(0, 0, -4);
-  grupo.add(crearSuelo(COLOR.sueloMarte), perseverance);
-  return grupo;
-}
 
 const gltf = new GLTFLoader();
 
@@ -271,9 +183,8 @@ let postLuna: { render(): void; ajustar(ancho: number, alto: number): void } | n
 let guardadaMuseo: { posicion: THREE.Vector3; yaw: number; cabeceo: number } | null = null;
 /** Capa negra de fundido (DOM encima del canvas). */
 let fundidoEl: HTMLDivElement | null = null;
-/** Renderer y luces de las misiones: se alternan con el ambiente del museo al entrar y salir. */
+/** Renderer: su tone mapping y exposición se alternan con el ambiente del museo al entrar y salir. */
 let rendererPrincipal: THREE.WebGLRenderer | null = null;
-let lucesMision: THREE.Group | null = null;
 let ambienteMuseo: AmbienteMuseo | null = null;
 /** true mientras el jugador está en el museo; false en una escena de misión. */
 let enMuseo = true;
@@ -368,15 +279,6 @@ async function iniciar(container: HTMLElement): Promise<void> {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = EXPOSICION;
 
-  // Luces de Marte: las de siempre, con luz plana y sin sombras. La Luna lleva sus propias luces (lunaEscena.ts).
-  const luces = new THREE.Group();
-  luces.add(new THREE.HemisphereLight(0xffffff, 0x8a929c, 1.6));
-  const sol = new THREE.DirectionalLight(0xffffff, 1.0);
-  sol.position.set(4, 8, 5);
-  luces.add(sol);
-  luces.visible = false;
-  lucesMision = luces;
-  escenaNueva.add(luces);
 
   // Ambiente del museo: luces, niebla, nebulosa, asteroides y bloom.
   const ambiente = crearAmbienteMuseo(renderer, camaraNueva);
@@ -498,15 +400,14 @@ function mostrarMuseo(visible: boolean): void {
 
 /**
  * Alterna el aspecto de cada lugar: luces, niebla, fondo, tone mapping y plano lejano de la cámara.
- * Museo y Luna usan tone mapping ACES con bloom; Marte conserva su luz plana sin tone mapping.
+ * Museo y Luna usan tone mapping ACES con bloom.
  */
 function activarAmbiente(lugar: 'museo' | Escena): void {
   const activo = lugar === 'museo';
   enMuseo = activo;
   escenaActual = activo ? null : lugar;
-  if (lucesMision) lucesMision.visible = lugar === 'marte';
   if (rendererPrincipal) {
-    rendererPrincipal.toneMapping = lugar === 'marte' ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+    rendererPrincipal.toneMapping = THREE.ACESFilmicToneMapping;
     rendererPrincipal.toneMappingExposure = lugar === 'luna' ? EXPOSICION_LUNA : EXPOSICION;
   }
   if (camara) {
@@ -534,7 +435,7 @@ function entrarEscena(escena: Escena): void {
   if (escenaObj) escenaObj.visible = true;
   // En la Luna, el fondo lo borra la primera pasada (lo lejano): un color de fondo forzaría otro borrado en la
   // segunda pasada y taparía el cielo y los macizos.
-  escenaPrincipal.background = escena === 'luna' ? null : new THREE.Color(FONDO_ESCENA[escena]);
+  escenaPrincipal.background = null;
   cabeceo = 0;
   vaciarMovimientoPendiente();
   sentadoLRV = false;
@@ -542,18 +443,13 @@ function entrarEscena(escena: Escena): void {
   ruedasLRV?.reiniciar();
   posicionPreviaLRV = null;
   salirDespegue();
-  if (escena === 'luna') {
-    // Cada visita empieza igual: LM entero, sin huellas, y el LRV plegado en la bahía del LM, como viajó (despliegueLRV.ts).
-    despegue?.reiniciar();
-    huellasLuna?.vaciar();
-    poseDespliegueLRV(0, 0);
-    // Llegada junto al LM y al LRV, de pie, mirando hacia los dos (sitioApollo17.ts).
-    posicion = new THREE.Vector3(LLEGADA.x, alturaLuna(LLEGADA.x, LLEGADA.z) + ALTURA_OJOS, LLEGADA.z);
-    yaw = -THREE.MathUtils.degToRad(LLEGADA.azimutMirada);
-  } else {
-    posicion = new THREE.Vector3(LLEGADA_ESCENA.x, ALTURA_OJOS, LLEGADA_ESCENA.z);
-    yaw = 0;
-  }
+  // Cada visita empieza igual: LM entero, sin huellas, y el LRV plegado en la bahía del LM, como viajó (despliegueLRV.ts).
+  despegue?.reiniciar();
+  huellasLuna?.vaciar();
+  poseDespliegueLRV(0, 0);
+  // Llegada junto al LM y al LRV, de pie, mirando hacia los dos (sitioApollo17.ts).
+  posicion = new THREE.Vector3(LLEGADA.x, alturaLuna(LLEGADA.x, LLEGADA.z) + ALTURA_OJOS, LLEGADA.z);
+  yaw = -THREE.MathUtils.degToRad(LLEGADA.azimutMirada);
   actualizarCamara();
 }
 
@@ -651,9 +547,6 @@ function aplicarMovimientoCamara(dx: number, dy: number, dCabeceo: number, dLate
           posicion.z = v.z + (oz / d) * minimo;
         }
       }
-    } else {
-      posicion.x = THREE.MathUtils.clamp(posicion.x, -LIMITE_MISION_X_Z, LIMITE_MISION_X_Z);
-      posicion.z = THREE.MathUtils.clamp(posicion.z, -LIMITE_MISION_X_Z, LIMITE_MISION_X_Z);
     }
   }
   actualizarCamara();

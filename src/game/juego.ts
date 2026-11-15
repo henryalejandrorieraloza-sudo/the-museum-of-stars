@@ -354,9 +354,6 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
               instruccionDesplegarDicha = true;
             });
           }
-        } else {
-          claveMision = 'escena_marte_construccion';
-          ui.mostrarMision(t(claveMision));
         }
         break;
       case 'regresoMuseo':
@@ -395,7 +392,7 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
     ui.aviso(t('cargando_museo'));
     await escenaLista;
   } catch (err) {
-    ui.aviso(`Error: ${mensajeDe(err)}`);
+    ui.aviso(t('error_generico', { error: mensajeDe(err) }));
     console.error(err);
     return;
   }
@@ -750,7 +747,7 @@ function actualizarPresentacion(sesion: Sesion, ahoraS: number): void {
 const SIN_BALANCEO: EntradaBalanceo = { caminando: false, pasosNuevos: 0, pasosPorSegundo: 0 };
 
 /**
- * Balanceo de la cámara al caminar (solo visual): en el museo y a pie en la Luna. Sentado en el LRV, en Marte o
+ * Balanceo de la cámara al caminar (solo visual): en el museo y a pie en la Luna. Sentado en el LRV o
  * durante una transición, no hay caminata: la amplitud baja a cero.
  */
 function actualizarBalanceo(balanceo: BalanceoCaminata, sesion: Sesion, lectura: LecturaEntrada): void {
@@ -831,7 +828,7 @@ function aplicarLectura(sesion: Sesion, lectura: LecturaEntrada): void {
     metros: lectura.avanceM,
     lateralMetros: lectura.lateralM,
     apuntando,
-    // Entrar a la escena con aplauso o barra espaciadora (SPEC 5.2). Volver desde una misión sin Luna (Marte): aplauso,
+    // Entrar a la escena con aplauso o barra espaciadora (SPEC 5.2). Volver desde una misión: aplauso,
     // o E mantenida con teclado (actualizarVolver).
     accion: accionDeAplauso(sesion, lectura),
   });
