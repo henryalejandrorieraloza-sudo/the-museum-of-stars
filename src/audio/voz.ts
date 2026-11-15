@@ -7,9 +7,10 @@ export type { OyenteVoz } from './sincronia';
 // Voz del mentor con Web Speech API (SPEC 1, 7.2 y 11). Desacoplada: el resto del juego solo llama a `hablar`
 // y `cancelar`. Para usar archivos grabados, se cambia esta implementación y no el resto.
 //
-// La explicación se reproduce frase a frase: al terminar una (evento onend) empieza la siguiente. Así Chrome
-// no corta frases largas. Si no hay voces o la síntesis falla, cada frase dura lo que tardaría leída a
-// CARACTERES_POR_SEGUNDO, de modo que el flujo del museo nunca se queda esperando (SPEC 7.2).
+// La explicación se reproduce frase a frase. La frase siguiente se envía a la cola del navegador mientras suena
+// la actual, así el navegador las encadena casi sin silencio (no espera a nuestro evento de fin). Si no hay voces
+// o la síntesis falla, cada frase dura lo que tardaría leída a CARACTERES_POR_SEGUNDO, de modo que el flujo del
+// museo nunca se queda esperando (SPEC 7.2).
 
 /** Ritmo del temporizador de respaldo cuando no hay voz (caracteres por segundo). */
 export const CARACTERES_POR_SEGUNDO = 15;
@@ -76,6 +77,16 @@ export function elegirVoz(voces: SpeechSynthesisVoice[], idioma: string): Speech
 /** Duración (ms) de una frase leída al ritmo del respaldo. */
 export function duracionRespaldoMs(frase: string): number {
   return Math.round((frase.length / CARACTERES_POR_SEGUNDO) * 1000);
+}
+
+/** Estado de una frase de la explicación: si ya empezó, terminó o falló, y si el navegador envía eventos de palabra. */
+interface EstadoFrase {
+  utterance?: SpeechSynthesisUtterance;
+  empezada: boolean;
+  hecha: boolean;
+  comenzada: boolean;
+  conEventosDePalabra: boolean;
+  fallo: boolean;
 }
 
 /** `idioma` puede ser una función: se lee al hablar cada frase, para que el cambio de idioma se note al momento. */
@@ -165,7 +176,12 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
       const sync = new Sincronia(guion, () => oyente, alFrase);
       sincActual = sync;
       const trozos = guion.frases;
+      /** Siguiente frase a volver vigente. */
       let indice = 0;
+      /** Frase vigente (la que suena o está a punto de sonar). */
+      let actual = -1;
+      /** Estado de cada frase enviada a la síntesis (puede haberse enviado antes de ser vigente). */
+      const estados = new Map<number, EstadoFrase>();
       sync.empezar();
 
       const acabar = (): void => {
@@ -184,56 +200,61 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
         return w;
       };
 
-      const siguiente = (): void => {
-        if (id !== vigente) return;
-        detener();
+      /** Sube el subtítulo y el gesto de la frase n (una sola vez). */
+      const iniciar = (n: number): void => {
+        const e = estados.get(n);
+        if (!e || e.empezada || id !== vigente) return;
+        e.empezada = true;
+        sync.frase(n);
+      };
+
+      /** Termina la frase n una sola vez y pasa a la siguiente. */
+      const terminarFrase = (n: number): void => {
+        const e = estados.get(n);
+        if (!e || e.hecha || id !== vigente) return;
+        e.hecha = true;
+        iniciar(n);
         limpiarCues();
-        if (indice >= trozos.length) {
-          acabar();
-          return;
-        }
-        const n = indice++;
+        sync.finFrase(n);
+        siguiente();
+      };
+
+      /** Gestos a tiempo estimado (CARACTERES_POR_SEGUNDO) para las palabras de la frase n que tienen marca. */
+      const programarEstimados = (n: number, yaPasadoMs: number): void => {
         const frase = trozos[n];
-
-        // El subtítulo y el gesto de la frase salen cuando la voz EMPIEZA a sonar (onstart), no cuando se pide: la
-        // síntesis tarda en arrancar y, si no, el texto se adelantaría a Robi. Sin voz (temporizador de respaldo), sale ya.
-        let empezada = false;
-        const iniciar = (): void => {
-          if (empezada || id !== vigente) return;
-          empezada = true;
-          sync.frase(n);
-        };
-
-        // Cada frase termina una sola vez: por evento de fin, por error o por temporizador.
-        let hecha = false;
-        const terminarFrase = (): void => {
-          if (hecha || id !== vigente) return;
-          hecha = true;
-          iniciar();
-          limpiarCues();
-          sync.finFrase(n);
-          siguiente();
-        };
-
-        /** Gestos a tiempo estimado (CARACTERES_POR_SEGUNDO) para las palabras de esta frase que tienen marca. */
-        const programarEstimados = (yaPasadoMs: number): void => {
-          for (let w = frase.primera; w <= frase.ultima; w++) {
-            if (guion.palabras[w].cues.length === 0 && guion.palabras[w].planos.length === 0) continue;
-            const ms = duracionRespaldoMs(guion.texto.slice(frase.inicio, guion.palabras[w].inicio)) - yaPasadoMs;
-            temporizadoresCue.push(
-              window.setTimeout(() => {
-                if (id === vigente) sync.palabra(w);
-              }, Math.max(0, ms)),
-            );
-          }
-        };
-
-        if (!sintesis || !hayVoces()) {
-          iniciar();
-          programarEstimados(0);
-          programar(duracionRespaldoMs(frase.texto), terminarFrase);
-          return;
+        for (let w = frase.primera; w <= frase.ultima; w++) {
+          if (guion.palabras[w].cues.length === 0 && guion.palabras[w].planos.length === 0) continue;
+          const ms = duracionRespaldoMs(guion.texto.slice(frase.inicio, guion.palabras[w].inicio)) - yaPasadoMs;
+          temporizadoresCue.push(
+            window.setTimeout(() => {
+              if (id === vigente) sync.palabra(w);
+            }, Math.max(0, ms)),
+          );
         }
+      };
+
+      /** Sin voz o con error: la frase n sale ya y se lee por temporizador al ritmo de respaldo. */
+      const respaldo = (n: number): void => {
+        iniciar(n);
+        programarEstimados(n, 0);
+        programar(duracionRespaldoMs(trozos[n].texto), () => terminarFrase(n));
+      };
+
+      /**
+       * Envía la frase n a la cola de la síntesis. Puede llamarse antes de que la frase sea vigente: el navegador
+       * la encadena tras la anterior sin esperar a nuestro evento de fin. Devuelve false si no hay voz.
+       */
+      const enviar = (n: number): boolean => {
+        if (!sintesis || !hayVoces()) return false;
+        const frase = trozos[n];
+        const e: EstadoFrase = {
+          empezada: false,
+          hecha: false,
+          comenzada: false,
+          conEventosDePalabra: false,
+          fallo: false,
+        };
+        estados.set(n, e);
         try {
           const utterance = new SpeechSynthesisUtterance(frase.texto);
           const lang = typeof idioma === 'function' ? idioma() : idioma;
@@ -243,58 +264,80 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
           utterance.pitch = TONO_VOZ;
           const elegida = elegirVoz(sintesis.getVoices(), lang);
           if (elegida) utterance.voice = elegida;
+          e.utterance = utterance;
           frases.push(utterance);
-          let conEventosDePalabra = false;
-          let comenzada = false;
           utterance.onstart = () => {
-            comenzada = true;
-            iniciar();
+            if (estados.get(n) !== e || id !== vigente) return;
+            e.comenzada = true;
+            iniciar(n);
             // Si en 0.7 s no ha llegado ningún evento de palabra, este navegador no los envía: se estima.
             temporizadoresCue.push(
               window.setTimeout(() => {
-                if (id === vigente && !conEventosDePalabra) programarEstimados(700);
+                if (id === vigente && estados.get(n) === e && !e.conEventosDePalabra) programarEstimados(n, 700);
               }, 700),
             );
           };
-          utterance.onboundary = (e) => {
-            if (id !== vigente || (e.name && e.name !== 'word')) return;
-            conEventosDePalabra = true;
-            sync.palabra(palabraEn(frase.inicio + e.charIndex));
+          utterance.onboundary = (ev) => {
+            if (estados.get(n) !== e || id !== vigente || (ev.name && ev.name !== 'word')) return;
+            e.conEventosDePalabra = true;
+            sync.palabra(palabraEn(frase.inicio + ev.charIndex));
           };
-          utterance.onend = terminarFrase;
-          // Un error no debe dejar el flujo parado: la frase sigue con el temporizador de respaldo.
-          utterance.onerror = (e) => {
-            if (!hecha && id === vigente) console.warn('Voz: error de síntesis, sigue el temporizador:', e.error, frase.texto);
-            if (!hecha && id === vigente) {
-              iniciar();
-              programarEstimados(0);
-              programar(duracionRespaldoMs(frase.texto), terminarFrase);
-            }
+          utterance.onend = () => {
+            if (estados.get(n) === e) terminarFrase(n);
+          };
+          // Un error no debe dejar el flujo parado: la frase pasa a leerse por temporizador.
+          utterance.onerror = (ev) => {
+            if (estados.get(n) !== e || id !== vigente || e.hecha) return;
+            console.warn('Voz: error de síntesis, sigue el temporizador:', ev.error, frase.texto);
+            e.fallo = true;
+            if (n === actual) respaldo(n);
           };
           sintesis.speak(utterance);
-          // Si la frase no ha empezado a sonar, se cancela y se pide otra vez una sola vez.
-          temporizadoresCue.push(
-            window.setTimeout(() => {
-              if (id !== vigente || hecha || comenzada || enPausa) return;
-              console.warn('Voz: la frase no empezó, se vuelve a pedir:', frase.texto);
-              try {
-                sintesis.cancel();
-                sintesis.speak(utterance);
-              } catch {
-                // Sin reintento: queda el temporizador de respaldo.
-              }
-            }, ESPERA_INICIO_FRASE_MS),
-          );
-          // Sin aviso de inicio (algunos navegadores no envían onstart), el subtítulo sale igualmente.
-          temporizadoresCue.push(window.setTimeout(iniciar, ESPERA_SUBTITULO_SIN_AVISO_MS));
-          // Vigilancia: si el navegador nunca envía el evento de fin, la frase avanza igualmente.
-          programar(duracionRespaldoMs(frase.texto) + MARGEN_VIGILANCIA_MS, terminarFrase);
+          return true;
         } catch {
-          // Sin voz disponible o síntesis fallida: el subtítulo sale ya y la frase se lee por temporizador.
-          iniciar();
-          programarEstimados(0);
-          programar(duracionRespaldoMs(frase.texto), terminarFrase);
+          // Sin voz disponible o síntesis fallida: la frase se leerá por temporizador.
+          e.fallo = true;
+          return false;
         }
+      };
+
+      const siguiente = (): void => {
+        if (id !== vigente) return;
+        detener();
+        limpiarCues();
+        if (indice >= trozos.length) {
+          acabar();
+          return;
+        }
+        const n = indice++;
+        actual = n;
+        if (!estados.has(n)) enviar(n);
+        const e = estados.get(n);
+        if (!e?.utterance || e.fallo) {
+          respaldo(n);
+          return;
+        }
+
+        // Si la frase no ha empezado a sonar, se cancela la cola y se vuelve a enviar (una sola vez).
+        temporizadoresCue.push(
+          window.setTimeout(() => {
+            if (id !== vigente || estados.get(n) !== e || e.hecha || e.comenzada || enPausa) return;
+            console.warn('Voz: la frase no empezó, se vuelve a pedir:', trozos[n].texto);
+            try {
+              sintesis?.cancel();
+            } catch {
+              // Sin reintento: queda el temporizador de respaldo.
+            }
+            // Al cancelar se pierde también la frase encolada: se vuelven a enviar la actual y la siguiente.
+            for (let k = n; k <= n + 1 && k < trozos.length; k++) if (estados.has(k)) enviar(k);
+          }, ESPERA_INICIO_FRASE_MS),
+        );
+        // Sin aviso de inicio (algunos navegadores no envían onstart), el subtítulo sale igualmente.
+        temporizadoresCue.push(window.setTimeout(() => iniciar(n), ESPERA_SUBTITULO_SIN_AVISO_MS));
+        // Vigilancia: si el navegador nunca envía el evento de fin, la frase avanza igualmente.
+        programar(duracionRespaldoMs(trozos[n].texto) + MARGEN_VIGILANCIA_MS, () => terminarFrase(n));
+        // La siguiente frase entra ya en la cola del navegador: al terminar esta, suena sin silencio.
+        if (indice < trozos.length && !estados.has(indice)) enviar(indice);
       };
 
       const empezarConSintesis = (): void => {
