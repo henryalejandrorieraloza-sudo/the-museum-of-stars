@@ -316,7 +316,7 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
   const anillo = crearAnillo();
   const instruccion = crearInstruccion();
   const inicio = crearInicioUi();
-  const modos = crearModosUi();
+  const modos = crearModosUi(anillo);
   const tallerUi = crearTallerUi();
   const video = requireEl<HTMLVideoElement>('camara');
   // Opciones (SPEC 13): el panel modifica este mismo objeto al cambiar un valor.
@@ -535,13 +535,20 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
 
   // --- Pantalla de modos y taller 3D ---------------------------------------------------------------------------
   let modoExplicado: ModoApp | null = null;
-  modos.alExplorar((modo) => {
-    // Robi explica el cuadrante; si ya está contando ese mismo, no se repite.
-    if (modo === modoExplicado && mentorHablando) return;
+  // Opción elegida (señalada hasta llenar el anillo, o enfocada con Tab): Robi la describe en ese momento y dice cómo entrar.
+  modos.alSeleccionar((modo) => {
     modoExplicado = modo;
     colaFrases.length = 0;
     voz.cancelar();
-    hablar(voz, ui, FRASE_MODO[modo]);
+    hablar(
+      voz,
+      ui,
+      FRASE_MODO[modo],
+      () => {
+        if (modoExplicado === modo) hablar(voz, ui, modoControl === 'teclado' ? 'modos_confirmar_teclado' : 'modos_confirmar_camara');
+      },
+      true,
+    );
   });
 
   /** Pantalla de modos: Robi invita a elegir y, según el cuadrante elegido, empieza ese modo. */
@@ -629,6 +636,9 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
       return;
     }
     const lectura = fuente.leer(ahoraS);
+    // La pantalla de modos (si está abierta) recibe el dedo índice; el ratón lo maneja ella misma.
+    modos.apuntarCamara(lectura.listo ? lectura.senal : null);
+    if (lectura.aplauso) modos.aplaudir();
     if (lectura.aviso !== avisoActual) {
       avisoActual = lectura.aviso;
       ui.aviso(lectura.aviso);
@@ -1237,6 +1247,17 @@ function aplicarLuna(sesion: Sesion, entrada: EntradaLuna): void {
  */
 function senalar(sesion: Sesion, senal: Senal | null): string | null {
   const { cursorUi, anillo } = sesion;
+  // Con la pantalla de modos abierta, el anillo es de esa pantalla (ui/modosUi.ts): aquí no se toca, o lo apagaría
+  // en cada fotograma. Solo el cursor del dedo sigue visible.
+  if (motivosPausaEntrada.has('menu')) {
+    if (modoControl === 'camara' && senal?.tipo === 'cursor') {
+      cursorUi.mostrar(true);
+      cursorUi.mover(senal.x, senal.y, !senal.activo);
+    } else {
+      cursorUi.mostrar(false);
+    }
+    return null;
+  }
   if (sesion.museo.pantalla.tipo !== 'museo' || senal === null) {
     cursorUi.mostrar(false);
     // En la misión el anillo es del despliegue del LRV y de la recogida; solo se apaga el de señalar vitrinas.

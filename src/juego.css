@@ -1140,7 +1140,8 @@
 }
 
 .modos-celda:hover,
-.modos-celda:focus-within {
+.modos-celda:focus-within,
+.modos-celda--elegida {
   transform: translateY(-5px);
 }
 
@@ -1192,12 +1193,14 @@
 }
 
 .modos-cuadro:hover,
-.modos-cuadro:focus-visible {
+.modos-cuadro:focus-visible,
+.modos-cuadro--elegido {
   background: var(--acento-claro);
 }
 
 .modos-cuadro:hover::after,
-.modos-cuadro:focus-visible::after {
+.modos-cuadro:focus-visible::after,
+.modos-cuadro--elegido::after {
   opacity: 0.32;
 }
 
