@@ -53,6 +53,8 @@ export class SueloNaranja {
   private tiempoHundimientoS: number;
   private avisadoCercania = false;
   private avisadoRecoger = false;
+  /** A pie, junto al LRV y dentro de la zona del suelo: mantener E (o el puño) ya recoge. Lo fija `update`. */
+  private junto = false;
 
   /**
    * `recogidoAntes`: la muestra ya se recogió en esta sesión (el suelo sigue hundido y no hay avisos ni recogida).
@@ -65,6 +67,11 @@ export class SueloNaranja {
   /** Llenado del anillo de E (0–1). */
   get anilloProgreso(): number {
     return this.anillo;
+  }
+
+  /** Se puede recoger ahora mismo (a pie, junto al LRV y sin recoger aún): la caja de instrucción lo pide. */
+  get listoParaRecoger(): boolean {
+    return this.junto && !this.recogido;
   }
 
   /** La muestra ya se recogió: el suelo se desvanece y se hunde. */
@@ -106,6 +113,7 @@ export class SueloNaranja {
     const junto =
       aPieCerca &&
       Math.hypot(entrada.jugador.x - entrada.lrv.x, entrada.jugador.z - entrada.lrv.z) <= DISTANCIA_RECOGER_MUESTRA_M;
+    this.junto = junto;
 
     // Mismo anillo que el despliegue: mantener E lo llena; soltarla antes lo vacía sin recoger nada.
     this.anillo = avanzarAnilloMantener(this.anillo, dt, junto && entrada.manteniendoE);

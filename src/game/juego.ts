@@ -28,6 +28,7 @@ import { SueloNaranja } from './sueloNaranja';
 import { BalanceoCaminata, type EntradaBalanceo } from './balanceo';
 import type { FaseDespliegueLRV } from '../visual/despliegueApollo17';
 import { crearAnillo, type AnilloUi } from '../ui/anillo';
+import { crearInstruccion, type InstruccionUi } from '../ui/instruccion';
 import { GUION, PresentacionLRV, infoNarracion, opacidadMarca, type EventoPresentacion, type InfoNarracion } from './presentacionLRV';
 import { crearPresentacionUi, type PresentacionUi, type RotuloUi } from '../ui/presentacionUi';
 import { CinematicaDespegue, borrarProgresoDespegue, cargarProgresoDespegue, type EventoCinematica } from './cinematicaDespegue';
@@ -56,6 +57,10 @@ let instruccionDesplegarDicha = false;
 const yaDichas = new Set<ClaveTexto>();
 /** Robi ya saludó al visitante en esta visita (solo se saluda una vez, al empezar). */
 let saludoDado = false;
+/** El visitante ya eligió alguna vitrina en esta visita: deja de pedir “señala una vitrina”. */
+let vitrinaElegida = false;
+/** Paso que la caja de instrucción muestra ahora (“Aprieta espacio…”), o null. */
+let pasoActual: ClaveTexto | null = null;
 /** La voz ya dijo "Aprieta espacio para subirte" en esta visita: hasta entonces, el aplauso no sube al LRV. */
 let subidaLista = false;
 /** La voz ya explicó cómo conducir en esta visita: hasta entonces, caminar no mueve el LRV. */
@@ -149,6 +154,13 @@ const TEXTO_TECLADO: Partial<Record<ClaveTexto, ClaveTexto>> = {
   luna_sentado_en_LRV: 'luna_sentado_en_LRV_teclado',
   modos_robi_libre: 'modos_robi_libre_teclado',
   libre_bienvenida: 'libre_bienvenida_teclado',
+  instr_senalar: 'instr_senalar_teclado',
+  instr_desplegar: 'instr_desplegar_teclado',
+  instr_subir: 'instr_subir_teclado',
+  instr_golpear: 'instr_golpear_teclado',
+  instr_agarrar: 'instr_agarrar_teclado',
+  instr_recoger: 'instr_recoger_teclado',
+  instr_volver: 'instr_volver_teclado',
 };
 
 /** Nombre que el viajero escribió en la pantalla de inicio. Vacío = se usa "explorador" en el idioma activo. */
@@ -263,6 +275,7 @@ function decirAhora(voz: Voz, ui: JuegoUi, clave: ClaveTexto, alTerminar?: () =>
 function releerTextos(sesion: Sesion): void {
   const { ui, voz } = sesion;
   requireEl('ayuda').textContent = texto('ayuda');
+  mostrarPaso(sesion);
   if (claveMision) ui.mostrarMision(t(claveMision));
   if (!habla) return;
   if (mentorHablando) {
@@ -301,6 +314,7 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
   let pausaTotal = false;
   const cursorUi = crearCursor();
   const anillo = crearAnillo();
+  const instruccion = crearInstruccion();
   const inicio = crearInicioUi();
   const modos = crearModosUi();
   const tallerUi = crearTallerUi();
@@ -313,6 +327,7 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
       case 'vitrinaSeleccionada':
         // El mentor explica la vitrina frase a frase; cada frase va como subtítulo al empezar.
         // Al terminar la última (no antes) se habilita entrar (SPEC 7.2).
+        vitrinaElegida = true;
         hablar(voz, ui, evento.id, () => museo.terminoVoz(evento.id));
         break;
       case 'vitrinaDeseleccionada':
@@ -493,7 +508,7 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
   opcionesUi.onVisibilidad((abierto) => pausarEntrada('opciones', abierto));
   requireEl('ayuda').textContent = texto('ayuda');
 
-  const sesion: Sesion = { museo, ui, cursorUi, anillo, opciones, voz, presUi, cineUi, fuente, catalogoVoz };
+  const sesion: Sesion = { museo, ui, cursorUi, instruccion, anillo, opciones, voz, presUi, cineUi, fuente, catalogoVoz };
   // Omitir (botón o Enter): salta al modo libre, con la pantalla en negro.
   cineUi.alOmitir(() => {
     if (cinematica) eventosCinematica(sesion, cinematica.saltar());
@@ -602,6 +617,8 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
     sesion.voz.pausar(pausaTotal);
     avisoActual = undefined;
     sesion.ui.aviso(pausaTotal ? t('pausa') : null);
+    // En pausa el bucle no se ejecuta: la caja de instrucción se quita aquí y vuelve al reanudar.
+    if (pausaTotal) sesion.instruccion.mostrar(null);
   });
   const bucle = (): void => {
     const ahoraS = performance.now() / 1000;
@@ -627,6 +644,7 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
     actualizarVolver(sesion, lectura, enCinematica);
     actualizarPresentacion(sesion, ahoraS);
     actualizarCinematica(sesion, ahoraS);
+    mostrarPaso(sesion);
     // Saludo de Robi: en cuanto el visitante está listo (con cámara, ya encuadrado y calibrado; con teclado, al entrar).
     if (lectura.listo && !saludoDado && !enCinematica && mision === null && reanudarCinematicaS === null) {
       saludoDado = true;
@@ -646,11 +664,50 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
   }
 }
 
+/**
+ * Paso que el juego espera del jugador ahora mismo (lo que dice la caja de instrucción), o null si no espera ninguno.
+ * Se mira en cada vuelta del bucle: en cuanto el estado cambia, la caja cambia o desaparece.
+ */
+function pasoPendiente(sesion: Sesion): ClaveTexto | null {
+  // Con una pausa, una pantalla o una cinemática encima, no se pide nada.
+  if (motivosPausaEntrada.size > 0 || cinematicaActiva() || presentacion !== null) return null;
+  // Robi todavía habla (o le queda una frase en cola): primero termina, y solo después se pide la acción.
+  if (mentorHablando || colaFrases.length > 0) return null;
+  // Y el subtítulo de Robi sigue en pantalla (se quita unos instantes después de la voz): la caja espera a que desaparezca.
+  if (sesion.ui.subtitulosVisibles()) return null;
+  const { museo } = sesion;
+  if (mision === null) {
+    if (museo.pantalla.tipo !== 'museo') return null;
+    if (museo.esperaEntrada) return 'entrar_aplauso';
+    // Robi ya saludó y el visitante todavía no ha elegido ninguna vitrina: se le pide que señale una.
+    if (saludoDado && !vitrinaElegida && museo.vitrinaSeleccionada === null) return 'instr_senalar';
+    return null;
+  }
+  if (mision.bloqueada) {
+    // Muestra asegurada: se pide volver al museo, salvo mientras el anillo ya se está llenando.
+    return volverAnillo === 0 && !cinematicaActiva() ? 'instr_volver' : null;
+  }
+  if (despliegue?.estado === 'plegado') return instruccionDesplegarDicha ? 'instr_desplegar' : null;
+  if (mision.estado === 'cerca_de_roca') return 'instr_golpear';
+  if (mision.estado === 'golpeando') return 'instr_agarrar';
+  if (sueloNaranja?.listoParaRecoger) return 'instr_recoger';
+  if (mision.aPie && subidaLista && despliegue?.desplegado === true) return 'instr_subir';
+  return null;
+}
+
+/** Pone en la caja el paso pendiente (con el texto del idioma y del control activos). */
+function mostrarPaso(sesion: Sesion): void {
+  pasoActual = pasoPendiente(sesion);
+  sesion.instruccion.mostrar(pasoActual === null ? null : texto(pasoActual));
+}
+
 /** Estado que persiste entre fotogramas. */
 interface Sesion {
   museo: Museo;
   ui: JuegoUi;
   cursorUi: CursorUi;
+  /** Caja de instrucción: el paso que el juego espera del jugador (ver pasoPendiente). */
+  instruccion: InstruccionUi;
   /** Anillo de mantener E para desplegar el LRV. */
   anillo: AnilloUi;
   /** Opciones vivas: el panel las modifica en el mismo objeto. */

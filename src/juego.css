@@ -209,6 +209,65 @@
   display: block;
 }
 
+/* Caja de instrucción: el paso que el juego espera (“Pulsa espacio para entrar”). Va en la misma franja que los
+   subtítulos (abajo, centrada) y sigue su lenguaje: texto blanco grande con sombra suave, sobre un velo oscuro
+   translúcido, con el acento amarillo del anillo. No captura clics. */
+.instruccion {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 6vh;
+  width: max-content;
+  max-width: min(78ch, calc(100% - 32px));
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 26px 14px 18px;
+  border-radius: 10px;
+  background: rgba(10, 12, 16, 0.55);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-family: 'Netflix Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  pointer-events: none;
+  z-index: 4;
+  animation: instruccion-entra 0.25s ease-out;
+}
+
+.instruccion-marca {
+  align-self: stretch;
+  width: 5px;
+  flex: none;
+  border-radius: 3px;
+  background: #ffd60a;
+  box-shadow: 0 0 10px rgba(255, 214, 10, 0.45);
+}
+
+.instruccion-texto {
+  margin: 0;
+  font: 600 clamp(20px, 3.6vh, 36px)/1.25 'Netflix Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  text-shadow:
+    0 0 2px rgba(0, 0, 0, 0.9),
+    0 2px 4px rgba(0, 0, 0, 0.85);
+}
+
+@keyframes instruccion-entra {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .instruccion {
+    animation: none;
+  }
+}
+
 /* Botón y panel de opciones (SPEC 13). */
 .opciones-boton {
   position: fixed;

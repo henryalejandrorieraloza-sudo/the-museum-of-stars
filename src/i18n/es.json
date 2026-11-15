@@ -388,5 +388,19 @@
   "taller_cerrar": "Cerrar",
   "taller_menu": "Menú",
   "taller_ayuda": "D: desarmar o armar · clic en una pieza · arrastrar: orbitar · Shift + arrastrar o clic derecho: desplazar · flechas o W A S: orbitar alrededor · Q y E: bajar y subir · M: menú",
-  "taller_error": "No se pudo montar el taller 3D en este navegador."
+  "taller_error": "No se pudo montar el taller 3D en este navegador.",
+  "instr_senalar": "Señala una vitrina con el dedo durante 1.5 s",
+  "instr_senalar_teclado": "Mantén el clic sobre una vitrina 1.5 s",
+  "instr_desplegar": "Mantén el puño cerrado para desplegar el moon buggy",
+  "instr_desplegar_teclado": "Mantén pulsada la tecla E para desplegar el moon buggy",
+  "instr_subir": "Acércate y aplaude fuerte para subirte",
+  "instr_subir_teclado": "Acércate y pulsa espacio para subirte",
+  "instr_golpear": "Baja la mano de golpe para golpear la roca",
+  "instr_golpear_teclado": "Haz clic para golpear la roca",
+  "instr_agarrar": "Junta el pulgar y el índice para recoger la muestra",
+  "instr_agarrar_teclado": "Haz clic otra vez para recoger la muestra",
+  "instr_recoger": "Mantén el puño cerrado para recoger la muestra",
+  "instr_recoger_teclado": "Mantén pulsada la tecla E para recoger la muestra",
+  "instr_volver": "Mantén el puño cerrado para volver al museo",
+  "instr_volver_teclado": "Mantén pulsada la tecla E para volver al museo"
 }

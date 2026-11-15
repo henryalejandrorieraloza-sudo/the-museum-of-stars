@@ -120,6 +120,11 @@ export class Museo {
     this.oyentes.push(oyente);
   }
 
+  /** Robi ya explicó la vitrina con misión: aplaudir o pulsar espacio entra (la caja de instrucción lo pide). */
+  get esperaEntrada(): boolean {
+    return this.seleccionada !== null && this.fase === 'listo' && MISION_DE[this.seleccionada] !== null;
+  }
+
   /**
    * Avanza el fundido a negro (1 s en total). Se llama en cada vuelta del bucle, con o sin
    * fotograma nuevo, porque el fundido tiene su propio reloj.
