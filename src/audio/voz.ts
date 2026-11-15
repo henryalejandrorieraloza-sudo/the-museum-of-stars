@@ -24,6 +24,11 @@ const RETRASO_TRAS_CANCELAR_MS = 80;
 const ESPERA_INICIO_FRASE_MS = 1500;
 /** Margen (ms) que se da a una frase con voz antes de darla por perdida si nunca llega su evento de fin. */
 const MARGEN_VIGILANCIA_MS = 5000;
+/**
+ * Si el navegador no avisa de que la voz empezó (onstart ni palabras) en este tiempo (ms), el subtítulo sale igualmente:
+ * así nunca se queda una frase sin texto. Es mayor que ESPERA_INICIO_FRASE_MS para dar tiempo al reintento.
+ */
+const ESPERA_SUBTITULO_SIN_AVISO_MS = 3200;
 
 
 export interface Voz {
@@ -189,13 +194,22 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
         }
         const n = indice++;
         const frase = trozos[n];
-        sync.frase(n);
+
+        // El subtítulo y el gesto de la frase salen cuando la voz EMPIEZA a sonar (onstart), no cuando se pide: la
+        // síntesis tarda en arrancar y, si no, el texto se adelantaría a Robi. Sin voz (temporizador de respaldo), sale ya.
+        let empezada = false;
+        const iniciar = (): void => {
+          if (empezada || id !== vigente) return;
+          empezada = true;
+          sync.frase(n);
+        };
 
         // Cada frase termina una sola vez: por evento de fin, por error o por temporizador.
         let hecha = false;
         const terminarFrase = (): void => {
           if (hecha || id !== vigente) return;
           hecha = true;
+          iniciar();
           limpiarCues();
           sync.finFrase(n);
           siguiente();
@@ -215,6 +229,7 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
         };
 
         if (!sintesis || !hayVoces()) {
+          iniciar();
           programarEstimados(0);
           programar(duracionRespaldoMs(frase.texto), terminarFrase);
           return;
@@ -233,6 +248,7 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
           let comenzada = false;
           utterance.onstart = () => {
             comenzada = true;
+            iniciar();
             // Si en 0.7 s no ha llegado ningún evento de palabra, este navegador no los envía: se estima.
             temporizadoresCue.push(
               window.setTimeout(() => {
@@ -250,6 +266,7 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
           utterance.onerror = (e) => {
             if (!hecha && id === vigente) console.warn('Voz: error de síntesis, sigue el temporizador:', e.error, frase.texto);
             if (!hecha && id === vigente) {
+              iniciar();
               programarEstimados(0);
               programar(duracionRespaldoMs(frase.texto), terminarFrase);
             }
@@ -268,10 +285,13 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
               }
             }, ESPERA_INICIO_FRASE_MS),
           );
+          // Sin aviso de inicio (algunos navegadores no envían onstart), el subtítulo sale igualmente.
+          temporizadoresCue.push(window.setTimeout(iniciar, ESPERA_SUBTITULO_SIN_AVISO_MS));
           // Vigilancia: si el navegador nunca envía el evento de fin, la frase avanza igualmente.
           programar(duracionRespaldoMs(frase.texto) + MARGEN_VIGILANCIA_MS, terminarFrase);
         } catch {
-          // Sin voz disponible o síntesis fallida: el subtítulo queda y la frase se lee por temporizador.
+          // Sin voz disponible o síntesis fallida: el subtítulo sale ya y la frase se lee por temporizador.
+          iniciar();
           programarEstimados(0);
           programar(duracionRespaldoMs(frase.texto), terminarFrase);
         }
@@ -312,7 +332,7 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
       // Audio grabado, si existe para este texto; si falla (carga, formato, bloqueo), sigue con la síntesis.
       const linea = catalogo?.get(claveTexto(guion.texto));
       if (linea && trozos.length > 0) {
-        sync.frase(0);
+        // El subtítulo de la primera frase sale cuando el audio ya suena y llega a su primera palabra (sync.avanzar).
         grabada = reproducirLinea(
           linea,
           guion,

@@ -187,8 +187,13 @@ function hablar(voz: Voz, ui: JuegoUi, clave: ClaveTexto, alTerminar?: () => voi
     alTerminar?.();
   };
   if (completo) {
-    ui.subtitulos(texto(clave));
-    voz.hablar(textoGuion(clave), alAcabar);
+    // El texto entero sale cuando la voz empieza a sonar (la primera frase), para que no se adelante a Robi.
+    let mostrado = false;
+    voz.hablar(textoGuion(clave), alAcabar, () => {
+      if (mostrado || habla !== h) return;
+      mostrado = true;
+      ui.subtitulos(texto(clave));
+    });
     return;
   }
   voz.hablar(textoGuion(clave), alAcabar, (frase) => {
