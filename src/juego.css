@@ -779,6 +779,33 @@
   font-size: 14px;
 }
 
+/* Deslizadores del panel de opciones: sin el marco de los campos de texto, con el valor a la derecha. */
+.opciones-caja input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  accent-color: #fff;
+}
+
+.opciones-deslizador {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.opciones-valor {
+  min-width: 4ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.opciones-grupo {
+  margin: 0;
+  font: 600 15px/1.35 system-ui, sans-serif;
+}
+
 /* Presentación del LRV (src/ui/presentacionUi.ts). Encima de la escena y por debajo de los subtítulos (z-index 3). */
 .presentacion {
   position: fixed;

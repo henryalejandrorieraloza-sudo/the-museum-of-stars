@@ -25,6 +25,10 @@ export interface Opciones {
   tiempoAceleracion: number;
   /** Factor que multiplica la velocidad de giro de la vista con la cabeza (0.2–1.0). */
   sensibilidadGiro: number;
+  /** Factor que multiplica la velocidad de giro de la vista con el ratón en modo teclado (0.2–3). 1 = el valor de siempre. */
+  sensibilidadRaton: number;
+  /** Volumen de la voz del mentor y de las líneas grabadas (0 = silencio, 1 = máximo). */
+  volumen: number;
   /** Tamaño de la mano en la escena (0.6–2.0). Solo escala longitudes; el grosor de los huesos no cambia. */
   tamanoMano: number;
   /** Separación total entre las dos manos en metros (0–0.6). Cada mano se desplaza la mitad hacia su lado. */
@@ -68,6 +72,8 @@ export const OPCIONES_DEFAULT: Opciones = {
   velocidadMax: 1.2,
   tiempoAceleracion: 0.5,
   sensibilidadGiro: 0.6,
+  sensibilidadRaton: 1.0,
+  volumen: 1.0,
   tamanoMano: 1.25,
   separacionManos: HAND_SEPARATION_DEFAULT,
   ajusteManoModelo: HAND_FIT_DEFAULT,
@@ -85,6 +91,8 @@ export const RANGOS = {
   velocidadMax: [0.2, 3],
   tiempoAceleracion: [0.05, 3],
   sensibilidadGiro: [0.2, 1],
+  sensibilidadRaton: [0.2, 3],
+  volumen: [0, 1],
   tamanoMano: [0.6, 2],
   tiempoOcultarManoS: [0.1, 5],
   umbralSaltoManoM: [0, 0.5],
@@ -135,6 +143,8 @@ export function normalizarOpciones(datos: Partial<Record<keyof Opciones, unknown
     velocidadMax: enRango(datos.velocidadMax, RANGOS.velocidadMax, d.velocidadMax),
     tiempoAceleracion: enRango(datos.tiempoAceleracion, RANGOS.tiempoAceleracion, d.tiempoAceleracion),
     sensibilidadGiro: enRango(datos.sensibilidadGiro, RANGOS.sensibilidadGiro, d.sensibilidadGiro),
+    sensibilidadRaton: enRango(datos.sensibilidadRaton, RANGOS.sensibilidadRaton, d.sensibilidadRaton),
+    volumen: enRango(datos.volumen, RANGOS.volumen, d.volumen),
     tamanoMano: enRango(datos.tamanoMano, RANGOS.tamanoMano, d.tamanoMano),
     separacionManos: enRango(datos.separacionManos, RANGOS.separacionManos, d.separacionManos),
     ajusteManoModelo: typeof datos.ajusteManoModelo === 'boolean' ? datos.ajusteManoModelo : d.ajusteManoModelo,
