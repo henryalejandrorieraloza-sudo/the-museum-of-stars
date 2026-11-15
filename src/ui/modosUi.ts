@@ -51,6 +51,12 @@ function crear<K extends keyof HTMLElementTagNameMap>(tag: K, clase: string, hij
   return el;
 }
 
+/**
+ * «The Apollo Lunar Roving Vehicle», la página de la NSSDC (NASA) sobre el LRV, la misma fuente del taller 3D. Habla de
+ * los tres LRV, también del del Apolo 17. (La ficha 1971-063C es la del módulo lunar del Apolo 15, no la del LRV.)
+ */
+const URL_NSSDC_LRV = 'https://nssdc.gsfc.nasa.gov/planetary/lunar/apollo_lrv.html';
+
 export function crearModosUi(anillo: AnilloUi): ModosUi {
   const seccion = requireEl('modos');
   const lienzo = crear('canvas', 'modos-fondo');
@@ -115,7 +121,20 @@ export function crearModosUi(anillo: AnilloUi): ModosUi {
     const volver = crear('button', 'modos-volver', ['← ', t('volver_museo')]);
     volver.type = 'button';
     volver.addEventListener('click', () => elegirModo('volver'));
-    marco.replaceChildren(cabecera, crear('div', 'modos-rejilla', [triangulo, ...cuadros]), crear('p', 'modos-pista', [t('modos_pista')]), volver);
+    // Para saber más del LRV: la ficha de la NSSDC (NASA), en otra pestaña. Se abre con clic (señalar no abre pestañas:
+    // el navegador las bloquea si no hay un clic de verdad).
+    const enlace = crear('a', 'modos-mas-info-enlace', [t('modos_mas_info_enlace'), ' ↗']);
+    enlace.href = URL_NSSDC_LRV;
+    enlace.target = '_blank';
+    enlace.rel = 'noopener noreferrer';
+    const masInfo = crear('p', 'modos-mas-info', [t('modos_mas_info'), ' ', enlace]);
+    marco.replaceChildren(
+      cabecera,
+      crear('div', 'modos-rejilla', [triangulo, ...cuadros]),
+      crear('p', 'modos-pista', [t('modos_pista')]),
+      masInfo,
+      volver,
+    );
   }
 
   /** Cuadrante (modo) o botón de volver al museo que hay bajo un punto de pantalla, o null. */
