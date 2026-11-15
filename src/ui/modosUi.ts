@@ -20,7 +20,9 @@ export interface ModosUi {
   elegir(): Promise<ModoApp | 'volver'>;
   /** Una opción queda elegida (señalada o enfocada): Robi la describe y pide aplaudir o pulsar espacio para entrar. */
   alSeleccionar(oyente: (modo: ModoApp) => void): void;
-  /** Aplauso (cámara) o espacio: entra en la opción elegida, si hay una. */
+  /** Robi terminó de decir qué es la opción (o null al cambiarla): solo entonces se puede entrar con aplauso o espacio. */
+  fijarExplicado(modo: ModoApp | null): void;
+  /** Aplauso (cámara) o espacio: entra en la opción elegida, si hay una y Robi ya la explicó. */
   aplaudir(): void;
   /** Dedo índice de la cámara, cada fotograma (null si no hay lectura). Solo cuenta con la pantalla abierta. */
   apuntarCamara(senal: Senal | null): void;
@@ -67,8 +69,10 @@ export function crearModosUi(anillo: AnilloUi): ModosUi {
   let raton: { x: number; y: number; pulsado: boolean } | null = null;
   /** Dedo índice de la cámara, en px de pantalla. */
   let camara: { x: number; y: number; activo: boolean } | null = null;
-  /** Cuadrante que se está llenando y desde cuándo. */
-  let candidato: ModoApp | null = null;
+  /** Opción que Robi ya terminó de explicar: solo esa se puede entrar. null mientras no ha terminado. */
+  let explicado: ModoApp | null = null;
+  /** Cuadrante (o el botón de volver al museo) que se está llenando y desde cuándo. */
+  let candidato: ModoApp | 'volver' | null = null;
   let inicioLlenadoMs = 0;
 
   function pintar(): void {
@@ -114,10 +118,12 @@ export function crearModosUi(anillo: AnilloUi): ModosUi {
     marco.replaceChildren(cabecera, crear('div', 'modos-rejilla', [triangulo, ...cuadros]), crear('p', 'modos-pista', [t('modos_pista')]), volver);
   }
 
-  /** Cuadrante (modo) que hay bajo un punto de pantalla, o null. */
-  function modoBajo(x: number, y: number): ModoApp | null {
-    const cuadro = document.elementFromPoint(x, y)?.closest<HTMLElement>('.modos-cuadro[data-modo]');
-    return cuadro ? (cuadro.dataset.modo as ModoApp) : null;
+  /** Cuadrante (modo) o botón de volver al museo que hay bajo un punto de pantalla, o null. */
+  function modoBajo(x: number, y: number): ModoApp | 'volver' | null {
+    const el = document.elementFromPoint(x, y);
+    const cuadro = el?.closest<HTMLElement>('.modos-cuadro[data-modo]');
+    if (cuadro) return cuadro.dataset.modo as ModoApp;
+    return el?.closest('.modos-volver') ? 'volver' : null;
   }
 
   /** Punto que cuenta ahora: el dedo si la cámara lo ve señalando; si no, el ratón. */
@@ -127,14 +133,17 @@ export function crearModosUi(anillo: AnilloUi): ModosUi {
     return null;
   }
 
-  /** Cada fotograma: si se mantiene señalado un cuadrante, el anillo se llena y, al completarse, lo elige. */
+  /**
+   * Cada fotograma: si se mantiene señalado un cuadrante o el botón de volver al museo, el anillo se llena y, al
+   * completarse, lo elige (el cuadrante queda elegido y Robi lo describe; el botón vuelve al museo).
+   */
   function tick(): void {
     rafId = null;
     if (!esVisible) return;
     const punto = puntoActual();
     const ahora = performance.now();
     const bajo = punto ? modoBajo(punto.x, punto.y) : null;
-    if (punto && punto.senalando && bajo !== null && bajo !== elegido) {
+    if (punto && punto.senalando && bajo !== null && (bajo === 'volver' || bajo !== elegido)) {
       if (candidato !== bajo) {
         candidato = bajo;
         inicioLlenadoMs = ahora;
@@ -142,7 +151,10 @@ export function crearModosUi(anillo: AnilloUi): ModosUi {
       const progreso = Math.min(1, (ahora - inicioLlenadoMs) / (SEGUNDOS_SENALAR * 1000));
       anillo.situar(punto);
       anillo.mostrar(progreso, 'clic');
-      if (progreso >= 1) seleccionar(bajo);
+      if (progreso >= 1) {
+        if (bajo === 'volver') elegirModo('volver');
+        else seleccionar(bajo);
+      }
     } else {
       candidato = null;
       anillo.mostrar(null);
@@ -175,6 +187,8 @@ export function crearModosUi(anillo: AnilloUi): ModosUi {
 
   function elegirModo(modo: ModoApp | 'volver'): void {
     if (!alElegir) return;
+    // Una opción solo se entra cuando Robi ya dijo qué es (fijarExplicado); el botón de volver al museo, siempre.
+    if (modo !== 'volver' && modo !== explicado) return;
     if (rafId !== null) cancelAnimationFrame(rafId);
     rafId = null;
     candidato = null;
@@ -227,6 +241,7 @@ export function crearModosUi(anillo: AnilloUi): ModosUi {
     elegir() {
       pintar();
       elegido = null;
+      explicado = null;
       marcarElegido();
       candidato = null;
       seccion.classList.remove('inicio--saliendo');
@@ -242,6 +257,9 @@ export function crearModosUi(anillo: AnilloUi): ModosUi {
     },
     alSeleccionar(oyente) {
       oyenteSeleccionar = oyente;
+    },
+    fijarExplicado(modo) {
+      explicado = modo;
     },
     aplaudir,
     apuntarCamara(senal) {

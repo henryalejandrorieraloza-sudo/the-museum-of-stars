@@ -58,6 +58,14 @@
         <path d="M7 10h5V4.6A5 5 0 0 0 7 9.5z" fill="#fff" stroke="none" />
       </svg>
     </div>
+    <!-- Anillo del pellizco de confirmar (cámara): se llena mientras se sostiene pulgar e índice juntos. Lo dibuja src/ui/anillo.ts. -->
+    <div id="anillo-pellizco" class="anillo" hidden>
+      <svg viewBox="0 0 48 48" aria-hidden="true">
+        <circle class="anillo-fondo" cx="24" cy="24" r="20" />
+        <circle class="anillo-progreso" cx="24" cy="24" r="20" transform="rotate(-90 24 24)" />
+      </svg>
+      <span class="anillo-ok" aria-hidden="true">👌</span>
+    </div>
     <button id="opcionesBoton" class="opciones-boton" type="button"></button>
     <section id="opciones" class="opciones" hidden></section>
 

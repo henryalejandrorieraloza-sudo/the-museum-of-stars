@@ -87,15 +87,15 @@ export interface EntradaLuna {
    */
   mando: PosicionMando | null;
   /**
-   * Confirmar (pellizco o espacio) también vuelve al museo cuando no puede sentar ni bajar al jugador. Opcional: true. Con
-   * teclado es false: ahí se vuelve manteniendo E (`volver`) y espacio solo sube al LRV.
+   * Confirmar (pellizco o espacio) vuelve al museo cuando no puede sentar ni bajar al jugador, si es true. Opcional: true.
+   * juego.ts lo pasa en false: en la misión, volver es el botón «Volver al menú» o la E mantenida (`volver`); el pellizco no vuelve.
    */
   aplausoVuelve?: boolean;
   /** El jugador pidió volver al museo (E o puño mantenidos con el anillo lleno). Opcional: false. */
   volver?: boolean;
   /**
-   * Bajarse del LRV en este fotograma (tecla B o pellizco de confirmar). Opcional: false. Sentado, se mira
-   * antes que `aplauso`: con cámara los dos llegan con el mismo pellizco, y sentado ese gesto baja del LRV.
+   * Bajarse del LRV en este fotograma (tecla B o pellizco de la mano izquierda). Opcional: false. Sentado, se mira
+   * antes que `aplauso`: con cámara los dos llegan con ese pellizco, y sentado baja del LRV.
    */
   bajarse?: boolean;
   /**
@@ -329,7 +329,7 @@ export class MisionLuna {
     }
 
     // Bajarse: el LRV se detiene donde está (no avanza en este fotograma) y conserva la muestra. Va antes que
-    // `aplauso`, que con cámara llega a la vez (el mismo pellizco): sentado, baja del LRV y no vuelve al museo.
+    // `aplauso`, que con cámara llega a la vez (el mismo pellizco de la izquierda): sentado, baja del LRV y no vuelve al museo.
     if (entrada.bajarse && !this.bloqueadaMision && PUEDE_BAJARSE.includes(this.estadoActual)) {
       this.velocidadLRV = 0;
       ir('a_pie');

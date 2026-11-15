@@ -5,6 +5,7 @@
 import { checkFraming, type FramingStatus } from '../tracking/framing';
 import {
   pellizco,
+  pellizcoManoLibre,
   pellizcoConfirmar,
   pellizcoConfirmarEstadoInicial,
   PUNO_GRACIA_S,
@@ -54,9 +55,11 @@ export class FuenteCamara implements FuenteEntrada {
   private pasosVistos = 0;
   /**
    * Pellizco de confirmar (pulgar e índice, como en Perseverance): hace lo que antes el aplauso (entrar, elegir modo,
-   * subir al LRV y volver al museo) y, sentado en el LRV, baja de él.
+   * subir al LRV y volver al museo), con cualquiera de las dos manos.
    */
   private confirmarEstado: PellizcoConfirmarEstado = pellizcoConfirmarEstadoInicial;
+  /** Pellizco para subir al LRV y bajarse de él: solo de la mano izquierda, que no conduce. */
+  private manoLibreEstado: PellizcoConfirmarEstado = pellizcoConfirmarEstadoInicial;
   /** Palanca del mando en T del LRV, que sigue a la mano derecha. */
   private readonly mando = new MandoLRV();
   /** Manos que se separan o se juntan: desarmar o armar el LRV en el taller. */
@@ -189,6 +192,8 @@ export class FuenteCamara implements FuenteEntrada {
     const shoulderPx = frame.pose ? shoulderWidthPx(frame.pose, frame.width, frame.height) : null;
     const confirmar = pellizcoConfirmar(frame.hands, frame.width, frame.height, this.confirmarEstado, ahoraS);
     this.confirmarEstado = confirmar.estado;
+    const manoLibre = pellizcoManoLibre(frame.hands, frame.width, frame.height, this.manoLibreEstado, ahoraS);
+    this.manoLibreEstado = manoLibre.estado;
     // La palanca se mide en cada fotograma (también calibrando), para que su punto neutro y su suavizado sigan al día.
     lectura.mando = this.mando.actualizar(ahoraS, dtS, posturaMando(frame.hands, frame.pose, frame.width, frame.height));
 
@@ -213,11 +218,15 @@ export class FuenteCamara implements FuenteEntrada {
     // Balanceo de la cámara (solo visual): cada paso detectado es un extremo. No usa el roll ni cambia la detección.
     lectura.balanceo = { caminando: estadoPiernas.walking && roll !== null, pasosNuevos: pasos, pasosPorSegundo: null };
     // El pellizco (o la barra espaciadora) confirma: entrar y volver a la escena, elegir modo y subir al LRV (SPEC 5.2
-    // y 7.2). Sentado en el LRV, el mismo pellizco baja de él (la misión mira `bajarse` antes).
+    // y 7.2). Sentado en el LRV, el pellizco de la derecha (la que conduce) no hace nada: juego.ts lo ignora.
     // Como antes el aplauso, el pellizco cuenta aunque la entrada esté en pausa: la pantalla de modos pausa el juego
     // ('menu') y se confirma justo con este gesto. Bajarse del LRV, en cambio, solo sin pausa.
     lectura.aplauso = confirmar.detectado || (espacio && !this.pausada);
-    lectura.bajarse = confirmar.detectado && !this.pausada;
+    lectura.progresoPellizco = confirmar.progreso;
+    // Subir al LRV y bajarse: solo el pellizco de la mano izquierda (la que no conduce), con su propio anillo.
+    lectura.okManoLibre = manoLibre.detectado && !this.pausada;
+    lectura.progresoOkManoLibre = this.pausada ? null : manoLibre.progreso;
+    lectura.bajarse = lectura.okManoLibre;
     // Separar y juntar las manos solo lo usa el taller 3D, que pausa la entrada; juego.ts decide si cuenta.
     lectura.gestoManos = separar.gesto;
     // Señalar y pellizco dependen solo de la mano que señala.

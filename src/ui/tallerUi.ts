@@ -111,6 +111,9 @@ export function crearTallerUi(): TallerUi {
     ]);
     const volver = crear('button', 'taller-menu', ['← ', t('taller_menu'), ' · M']);
     volver.type = 'button';
+    // Con cámara se pulsa señalándolo un tiempo, con anillo (ui/botonesSenalables.ts), igual que en la misión. No lleva
+    // `data-senalable`: así no lo elige también el señalar de piezas y subsistemas del taller.
+    volver.dataset.botonSenalable = '';
     volver.addEventListener('click', () => salir());
     const cabecera = crear('header', 'taller-cabecera', [marca, titulo, estado, volver]);
 

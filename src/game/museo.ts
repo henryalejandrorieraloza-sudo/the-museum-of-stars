@@ -256,9 +256,14 @@ export class Museo {
    * de modos, con la vitrina del LRV seleccionada.
    */
   volverAModos(): void {
-    const id = this.vitrinaModos;
-    if (this.transicion || id === null) return;
+    if (this.transicion) return;
     if (this.pantallaActual.tipo !== 'mision' && this.pantallaActual.tipo !== 'presentacion') return;
+    const id = this.vitrinaModos;
+    // Una misión abierta sin pantalla de modos (p. ej. al reanudar el despegue) vuelve directo al museo.
+    if (id === null) {
+      this.volver();
+      return;
+    }
     this.iniciarTransicion(() => this.completarVolverAModos(id));
   }
 

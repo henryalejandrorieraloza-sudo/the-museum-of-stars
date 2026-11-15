@@ -239,12 +239,14 @@ export function pellizco(
 // ---------------------------------------------------------------------------
 
 /**
- * Tiempo (s) que hay que sostener el pellizco para que confirme. 0 = en cuanto se cierra, como el pellizco de
- * Perseverance (pellizcoNuevo en camaraFuente.ts), que Henry probó y le funciona bien.
+ * Tiempo (s) que hay que sostener el pellizco para que confirme. El anillo (ui/anillo.ts) se llena durante ese tiempo.
+ * Antes confirmaba en cuanto se cerraba, como Perseverance; Henry pidió sostenerlo.
  */
-export const PELLIZCO_CONFIRMAR_SOSTENER_S = 0;
+export const PELLIZCO_CONFIRMAR_SOSTENER_S = 1;
 /** Tras confirmar, tiempo (s) sin otro, para que un pellizco que parpadea en el umbral no confirme dos veces. */
 export const PELLIZCO_CONFIRMAR_COOLDOWN_S = 1;
+/** Tiempo (s) que el detector puede perder el pellizco sin reiniciar el llenado (parpadeos de MediaPipe). */
+export const PELLIZCO_CONFIRMAR_GRACIA_S = 0.25;
 
 export interface PellizcoConfirmarEstado {
   /** Desde cuándo (s) hay una mano pellizcando; null si ninguna. */
@@ -253,20 +255,29 @@ export interface PellizcoConfirmarEstado {
   armado: boolean;
   /** Última confirmación (s), para el cooldown. */
   ultimoS: number;
+  /** Última vez (s) que se vio el pellizco; para la gracia. */
+  vistoS: number;
 }
 
 export const pellizcoConfirmarEstadoInicial: PellizcoConfirmarEstado = {
   desdeS: null,
   armado: true,
   ultimoS: Number.NEGATIVE_INFINITY,
+  vistoS: Number.NEGATIVE_INFINITY,
 };
 
+/** Llenado (0–1) de un pellizco sostenido desde `desdeS`: lo que enseña el anillo. */
+function llenadoPellizco(desdeS: number, ahoraS: number): number {
+  return Math.min(1, Math.max(0, (ahoraS - desdeS) / PELLIZCO_CONFIRMAR_SOSTENER_S));
+}
+
 /**
- * Pellizco (pulgar e índice juntos, el de Perseverance) con una mano o con las dos: confirma al cerrarse (o tras
- * PELLIZCO_CONFIRMAR_SOSTENER_S), una vez por pellizco: hay que abrir los dedos de las dos manos para repetir, con
- * PELLIZCO_CONFIRMAR_COOLDOWN_S. Un puño cerrado no cuenta aunque el pulgar quede junto al índice (así, la mano derecha
- * en la palanca del LRV no confirma; en capturas de Henry, la pinza mide 0.11–0.14 y no es puño, y el puño mide 0.35).
- * Función pura.
+ * Pellizco (pulgar e índice juntos, el de Perseverance) con una mano o con las dos: confirma cuando se ha sostenido
+ * PELLIZCO_CONFIRMAR_SOSTENER_S, una vez por pellizco: hay que abrir los dedos de las dos manos para repetir, con
+ * PELLIZCO_CONFIRMAR_COOLDOWN_S. Un parpadeo del detector de menos de PELLIZCO_CONFIRMAR_GRACIA_S no reinicia el
+ * llenado. `progreso` (0–1) es lo que se llena el anillo mientras se sostiene; null si no hay nada que enseñar. Un puño
+ * cerrado no cuenta aunque el pulgar quede junto al índice (así, la mano derecha en la palanca del LRV no confirma; en
+ * capturas de Henry, la pinza mide 0.11–0.14 y no es puño, y el puño mide 0.35). Función pura.
  */
 export function pellizcoConfirmar(
   hands: TrackedHand[],
@@ -275,14 +286,49 @@ export function pellizcoConfirmar(
   estado: PellizcoConfirmarEstado,
   ahoraS: number,
   umbral = PELLIZCO_UMBRAL_DEFAULT,
-): { detectado: boolean; estado: PellizcoConfirmarEstado } {
+): { detectado: boolean; progreso: number | null; estado: PellizcoConfirmarEstado } {
   const alguna = hands.some((m) => (pellizco(m, w, h, umbral)?.cerrado ?? false) && !punoCerrado(m, w, h));
-  if (!alguna) return { detectado: false, estado: { ...estado, desdeS: null, armado: true } };
+  if (!alguna) {
+    // Dentro de la gracia no se suelta: el llenado sigue y el gesto no vuelve a armarse.
+    if (estado.desdeS !== null && ahoraS - estado.vistoS <= PELLIZCO_CONFIRMAR_GRACIA_S) {
+      return { detectado: false, progreso: estado.armado ? llenadoPellizco(estado.desdeS, ahoraS) : null, estado };
+    }
+    return { detectado: false, progreso: null, estado: { ...estado, desdeS: null, armado: true } };
+  }
   const desdeS = estado.desdeS ?? ahoraS;
   const listo =
     estado.armado && ahoraS - desdeS >= PELLIZCO_CONFIRMAR_SOSTENER_S && ahoraS - estado.ultimoS >= PELLIZCO_CONFIRMAR_COOLDOWN_S;
-  if (!listo) return { detectado: false, estado: { ...estado, desdeS } };
-  return { detectado: true, estado: { desdeS, armado: false, ultimoS: ahoraS } };
+  if (!listo) {
+    return {
+      detectado: false,
+      progreso: estado.armado ? llenadoPellizco(desdeS, ahoraS) : null,
+      estado: { ...estado, desdeS, vistoS: ahoraS },
+    };
+  }
+  return { detectado: true, progreso: null, estado: { desdeS, armado: false, ultimoS: ahoraS, vistoS: ahoraS } };
+}
+
+/**
+ * Subir al LRV y bajarse de él: el pellizco de la mano que no conduce (la izquierda, porque `posturaMando` lleva la
+ * palanca con la derecha). Es el mismo pellizco que `pellizcoConfirmar`, pero solo de esa mano y con su propio estado,
+ * así que el de la palanca no sube ni baja del LRV mientras se conduce. Función pura.
+ */
+export function pellizcoManoLibre(
+  hands: TrackedHand[],
+  w: number,
+  h: number,
+  estado: PellizcoConfirmarEstado,
+  ahoraS: number,
+  umbral = PELLIZCO_UMBRAL_DEFAULT,
+): { detectado: boolean; progreso: number | null; estado: PellizcoConfirmarEstado } {
+  return pellizcoConfirmar(
+    hands.filter((m) => m.label === 'Left'),
+    w,
+    h,
+    estado,
+    ahoraS,
+    umbral,
+  );
 }
 
 // ---------------------------------------------------------------------------

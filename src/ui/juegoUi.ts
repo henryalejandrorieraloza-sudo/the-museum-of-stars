@@ -13,6 +13,8 @@ export interface JuegoUi {
   subtitulosVisibles(): boolean;
   /** Indicación “Aplaude para entrar”. null la oculta. No depende del temporizador de los subtítulos. */
   mostrarMision(titulo: string): void;
+  /** Solo el botón «Volver al menú», sin título (misión lunar y exploración libre). */
+  mostrarVolverMenu(): void;
   ocultarMision(): void;
 }
 
@@ -23,11 +25,15 @@ export function crearUi(onVolver: () => void): JuegoUi {
   const mision = requireEl('mision');
   const misionTitulo = requireEl('misionTitulo');
   const volver = requireEl<HTMLButtonElement>('volver');
+  // Con cámara se pulsa señalándolo un tiempo (ui/botonesSenalables.ts), como los cuadrantes del menú.
+  volver.dataset.botonSenalable = '';
 
-  volver.textContent = t('volver_museo');
-  alCambiarIdioma(() => {
-    volver.textContent = t('volver_museo');
-  });
+  // Igual que el del taller 3D: con teclado también vuelve la M.
+  const rotular = (): void => {
+    volver.textContent = `← ${t('volver_menu')} · M`;
+  };
+  rotular();
+  alCambiarIdioma(rotular);
   volver.addEventListener('click', onVolver);
 
   let temporizadorSubtitulos: number | undefined;
@@ -52,6 +58,14 @@ export function crearUi(onVolver: () => void): JuegoUi {
     },
     mostrarMision(titulo) {
       misionTitulo.textContent = titulo;
+      misionTitulo.hidden = false;
+      mision.classList.remove('mision-solo-boton');
+      mision.hidden = false;
+    },
+    mostrarVolverMenu() {
+      misionTitulo.textContent = '';
+      misionTitulo.hidden = true;
+      mision.classList.add('mision-solo-boton');
       mision.hidden = false;
     },
     ocultarMision() {

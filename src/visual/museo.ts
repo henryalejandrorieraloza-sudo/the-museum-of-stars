@@ -56,8 +56,11 @@ const INICIO = { x: 0, z: 11 };
 const DISTANCIA_BAJADA_LRV_M = RADIO_OBSTACULO_LRV_M + 0.3;
 /** Plano lejano de la cámara en el museo (m). En la Luna se amplía a LEJANO_CAMARA_LUNA_M. */
 const LEJANO_CAMARA_M = 100;
-/** Sentado en el LRV, cuánto puede girar la vista a cada lado del rumbo (rad). */
-const LIMITE_MIRADA_LRV = THREE.MathUtils.degToRad(100);
+/**
+ * Sentado en el LRV, la vista queda fija mirando al frente del vehículo (la cabeza no la gira ni la sube) y solo se
+ * inclina con el terreno: cabeceo y balanceo del LRV, suavizados con esta constante de tiempo (s) para que no vibre.
+ */
+const TIEMPO_SUAVIZADO_CABINA_S = 0.5;
 /** Cabeceo máximo de la vista hacia arriba o abajo (rad, 35°). */
 const LIMITE_CABECEO = THREE.MathUtils.degToRad(35);
 
@@ -163,8 +166,9 @@ let haloRoca: THREE.Object3D | null = null;
 let escenaActual: Escena | null = null;
 /** En la Luna: el jugador va sentado en el LRV (la cámara va con el asiento). */
 let sentadoLRV = false;
-/** Sentado en el LRV: giro de la vista respecto al rumbo del vehículo (rad). */
-let miradaLRV = 0;
+/** Sentado en el LRV: inclinación de la caja (rad, suavizada). */
+const cabinaLRV = { cabeceo: 0, balanceo: 0 };
+const _eCabina = new THREE.Euler(0, 0, 0, 'YXZ');
 /** LRV de la escena lunar y su rumbo actual (°), para apoyar la cámara y esquivarlo a pie. */
 let lrvLuna: THREE.Object3D | null = null;
 /** Palanca del mando en T del LRV de la escena (pivote `mando_T`). */
@@ -234,6 +238,14 @@ function actualizarCamara(): void {
   // Durante la cinemática del despegue la cámara la coloca despegueLM.ts.
   if (!camara || enDespegue) return;
   camara.position.copy(posicion);
+  if (sentadoLRV && escenaActual === 'luna') {
+    // Sentado: vista fija al frente del LRV, con su rumbo y la inclinación del terreno. La palanca va igual.
+    camara.quaternion.setFromEuler(
+      _eCabina.set(cabinaLRV.cabeceo, -THREE.MathUtils.degToRad(rumboLRV), cabinaLRV.balanceo, 'YXZ'),
+    );
+    if (manoEnPalanca && vistaMando) vistaMando.colocar(camara.position, camara.quaternion);
+    return;
+  }
   // El balanceo solo se aplica en el museo y a pie en la Luna (juego.ts decide cuándo hay caminata).
   const conBalanceo = enMuseo || escenaActual === 'luna';
   if (conBalanceo) {
@@ -241,8 +253,17 @@ function actualizarCamara(): void {
     camara.position.y += balanceo.verticalM;
   }
   camara.rotation.set(cabeceo, yaw, conBalanceo ? THREE.MathUtils.degToRad(balanceo.rollGrados) : 0, 'YXZ');
-  // Sentado, la palanca va con los ojos, el rumbo del LRV y el cabeceo (no con el giro de la cabeza).
-  if (manoEnPalanca && vistaMando) vistaMando.colocar(camara.position, -THREE.MathUtils.degToRad(rumboLRV), cabeceo);
+}
+
+/**
+ * Sentado en el LRV, cada fotograma: la caja sigue la inclinación del LRV sobre el terreno, suavizada para que no
+ * vibre. `recienSentado` la toma sin suavizar.
+ */
+function moverCabinaLRV(lrv: THREE.Object3D, dtS: number, recienSentado: boolean): void {
+  const f = recienSentado ? 1 : 1 - Math.exp(-Math.max(0, dtS) / TIEMPO_SUAVIZADO_CABINA_S);
+  // colocarLRV pone la rotación en orden YXZ: x es el cabeceo y z el balanceo.
+  cabinaLRV.cabeceo += (lrv.rotation.x - cabinaLRV.cabeceo) * f;
+  cabinaLRV.balanceo += (lrv.rotation.z - cabinaLRV.balanceo) * f;
 }
 
 /**
@@ -495,7 +516,6 @@ function entrarEscena(escena: Escena): void {
   vaciarMovimientoPendiente();
   sentadoLRV = false;
   soltarPalanca();
-  miradaLRV = 0;
   ruedasLRV?.reiniciar();
   posicionPreviaLRV = null;
   salirDespegue();
@@ -578,6 +598,8 @@ function aplicarMovimientoPendiente(dtS: number): void {
 }
 
 function aplicarMovimientoCamara(dx: number, dy: number, dCabeceo: number, dLateral: number): void {
+  // Sentado en el LRV la vista está fija al frente: ni girar ni subir o bajar la cabeza la mueven.
+  if (escenaActual === 'luna' && sentadoLRV) return;
   cabeceo = THREE.MathUtils.clamp(cabeceo + THREE.MathUtils.degToRad(dCabeceo), -LIMITE_CABECEO, LIMITE_CABECEO);
   if (escenaActual === 'luna') {
     moverEnLuna(dx, dy, dLateral);
@@ -611,16 +633,10 @@ function aplicarMovimientoCamara(dx: number, dy: number, dCabeceo: number, dLate
 
 /**
  * Movimiento en la Luna. A pie: gira, camina sobre el suelo (con la curvatura), sin atravesar el LM ni el LRV y
- * dentro de RADIO_LRV_M (el mismo límite que el LRV). Sentado en el LRV: el giro mueve solo la vista, hasta ±100° del rumbo; el avance lo
- * gestiona la misión (game/luna.ts) y llega por actualizarLuna.
+ * dentro de RADIO_LRV_M (el mismo límite que el LRV). Sentado en el LRV no se llama: la vista va fija al frente y
+ * el avance lo gestiona la misión (game/luna.ts), que llega por actualizarLuna.
  */
 function moverEnLuna(dx: number, dy: number, dLateral: number): void {
-  if (sentadoLRV) {
-    miradaLRV = THREE.MathUtils.clamp(miradaLRV - THREE.MathUtils.degToRad(dx), -LIMITE_MIRADA_LRV, LIMITE_MIRADA_LRV);
-    yaw = -THREE.MathUtils.degToRad(rumboLRV) + miradaLRV;
-    actualizarCamara();
-    return;
-  }
   yaw -= THREE.MathUtils.degToRad(dx);
   posicion.addScaledVector(adelante(), dy);
   posicion.addScaledVector(derecha(), dLateral);
@@ -813,7 +829,11 @@ function actualizarLuna(estado: {
   }
   if (haloRoca) haloRoca.visible = estado.haloVisible;
   if (estado.sentado && lrvLuna) {
-    if (!sentadoLRV) miradaLRV = 0;
+    if (!sentadoLRV) {
+      // Al sentarse, la vista se pone al frente del LRV y se tira el giro que quedara por aplicar.
+      cabeceo = 0;
+      vaciarMovimientoPendiente();
+    }
     agarrarPalanca();
     if (estado.mando) {
       vistaMando?.inclinar(estado.mando.adelante, estado.mando.lado, estado.marchaAtras ?? false);
@@ -821,7 +841,11 @@ function actualizarLuna(estado: {
       if (palancaLuna) inclinarPalanca(palancaLuna, estado.mando.adelante, estado.mando.lado);
     }
     ojosEnLRV(lrvLuna, posicion);
-    yaw = -THREE.MathUtils.degToRad(estado.rumboGrados) + miradaLRV;
+    // Al bajarse, se mira hacia donde iba el LRV.
+    yaw = -THREE.MathUtils.degToRad(estado.rumboGrados);
+    moverCabinaLRV(lrvLuna, estado.dtS, !sentadoLRV);
+    // Ya sentado: actualizarCamara usa la caja del LRV (también en el primer fotograma).
+    sentadoLRV = true;
     actualizarCamara();
   } else if (sentadoLRV && lrvLuna) {
     // Se acaba de bajar: de pie junto al asiento del comandante (a la izquierda), mirando hacia donde miraba.

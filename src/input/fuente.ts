@@ -50,7 +50,7 @@ export interface LecturaEntrada {
   /**
    * Confirmar en este fotograma: el pellizco de pulgar e índice (cámara; antes era el aplauso, de ahí el nombre) o la
    * barra espaciadora. Entra a la vitrina, elige modo, sube al LRV y vuelve al museo. Con cámara, sentado en el LRV, el
-   * mismo pellizco llega también como `bajarse`.
+   * pellizco de la mano izquierda (la que no conduce) llega también como `bajarse`.
    */
   aplauso: boolean;
   /**
@@ -62,13 +62,22 @@ export interface LecturaEntrada {
   senal: Senal | null;
   /** El pellizco de la mano que señala se acaba de cerrar. */
   pellizcoNuevo: boolean;
+  /** Llenado (0–1) del pellizco de confirmar mientras se sostiene (cámara); null si no hay pellizco que mostrar. */
+  progresoPellizco: number | null;
   /**
    * Palanca del mando en T del LRV (misión lunar): con cámara, la sigue la mano derecha (game/mandoLRV.ts); con teclado,
    * W/S y A/D. null si no hay datos en este fotograma.
    */
   mando: PosicionMando | null;
-  /** Bajarse del LRV en este fotograma: tecla B, o el pellizco de confirmar con cámara (misión lunar). */
+  /** Bajarse del LRV en este fotograma: tecla B, o el pellizco de la mano izquierda con cámara (misión lunar). */
   bajarse: boolean;
+  /**
+   * Pellizco de la mano que no conduce (la izquierda) confirmado en este fotograma (cámara). En la misión lunar sube al
+   * LRV a pie y baja de él sentado. Con teclado, siempre false (ahí suben espacio y baja B).
+   */
+  okManoLibre: boolean;
+  /** Llenado (0–1) de ese pellizco de la mano izquierda mientras se sostiene (cámara); null si no hay nada que enseñar. */
+  progresoOkManoLibre: number | null;
   /** Gesto de manos del taller 3D (cámara): separarlas desarma el LRV y juntarlas de nuevo lo arma. */
   gestoManos: GestoManos | null;
   /** Tecla E mantenida: con el LRV plegado, llena el anillo de desplegarlo (misión lunar). */
@@ -111,8 +120,11 @@ export function lecturaVacia(ahoraS: number): LecturaEntrada {
     aplausoVuelve: true,
     senal: null,
     pellizcoNuevo: false,
+    progresoPellizco: null,
     mando: null,
     bajarse: false,
+    okManoLibre: false,
+    progresoOkManoLibre: null,
     gestoManos: null,
     desplegarMantenido: false,
     punoMantenido: false,

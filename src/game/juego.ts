@@ -38,7 +38,8 @@ import { avanzarAnilloMantener, DespliegueLRV } from './despliegueLRV';
 import { SueloNaranja } from './sueloNaranja';
 import { BalanceoCaminata, type EntradaBalanceo } from './balanceo';
 import type { FaseDespliegueLRV } from '../visual/despliegueApollo17';
-import { crearAnillo, type AnilloUi } from '../ui/anillo';
+import { crearAnillo, crearAnilloPellizco, type AnilloUi } from '../ui/anillo';
+import { crearSenalarBotones } from '../ui/botonesSenalables';
 import { crearInstruccion, type InstruccionUi } from '../ui/instruccion';
 import { GUION, PresentacionLRV, infoNarracion, opacidadMarca, type EventoPresentacion, type InfoNarracion } from './presentacionLRV';
 import { crearPresentacionUi, type PresentacionUi, type RotuloUi } from '../ui/presentacionUi';
@@ -320,13 +321,16 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
     },
   });
   const museo = new Museo();
-  const ui = crearUi(() => museo.volver());
+  // «Volver al menú» (botón o señalarlo): de la misión a la pantalla de modos, y de ahí, «Volver al museo».
+  const ui = crearUi(() => museo.volverAModos());
   const presUi = crearPresentacionUi();
   const cineUi = crearCinematicaUi();
   /** Pausa total con la tecla 7: congela el mundo, la voz y la entrada. */
   let pausaTotal = false;
   const cursorUi = crearCursor();
   const anillo = crearAnillo();
+  const anilloPellizco = crearAnilloPellizco();
+  const senalarBotones = crearSenalarBotones(anillo);
   const instruccion = crearInstruccion();
   const inicio = crearInicioUi();
   const modos = crearModosUi(anillo);
@@ -378,6 +382,8 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
       case 'misionAbierta':
         // Al salir de la presentación (si la hubo), se quita su capa. Lo demás de la misión no cambia.
         presentacion = null;
+        // Arriba, el botón «Volver al menú»: clic (teclado), señalarlo un tiempo (cámara) o la M. Se quita en regresoMuseo.
+        ui.mostrarVolverMenu();
         presUi.mostrar(false);
         requireEl('ayuda').hidden = false;
         colaFrases.length = 0;
@@ -565,6 +571,8 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
   // Opción elegida (señalada hasta llenar el anillo, o enfocada con Tab): Robi la describe en ese momento y dice cómo entrar.
   modos.alSeleccionar((modo) => {
     modoExplicado = modo;
+    // Hasta que Robi termine de decir qué es la opción, no se puede entrar en ella (ui/modosUi.ts).
+    modos.fijarExplicado(null);
     colaFrases.length = 0;
     voz.cancelar();
     hablar(
@@ -572,7 +580,9 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
       ui,
       FRASE_MODO[modo],
       () => {
-        if (modoExplicado === modo) hablar(voz, ui, modoControl === 'teclado' ? 'modos_confirmar_teclado' : 'modos_confirmar_camara');
+        if (modoExplicado !== modo) return;
+        modos.fijarExplicado(modo);
+        hablar(voz, ui, modoControl === 'teclado' ? 'modos_confirmar_teclado' : 'modos_confirmar_camara');
       },
       true,
     );
@@ -717,6 +727,7 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
     museo.tick(ahoraS);
     // Pausa total: el mundo y la voz se quedan quietos; la escena sigue visible.
     if (pausaTotal) {
+      anilloPellizco.mostrar(null);
       requestAnimationFrame(bucle);
       return;
     }
@@ -746,6 +757,10 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
       decirFrase(voz, ui, 'saludo_bienvenida', undefined, true);
       decirFrase(voz, ui, 'saludo_vitrinas', undefined, true);
     }
+    // La bolita del OK sale cuando juntar el pulgar y el índice hace algo (progresoBolitaOk); no en una cinemática.
+    anilloPellizco.mostrar(enCinematica ? null : progresoBolitaOk(sesion, lectura));
+    // Botones señalables (volver al menú, en la misión y en el taller): el dedo los llena y los pulsa.
+    senalarBotones.tick(dedoParaBotones(sesion, lectura), lectura.ahoraS);
     // El taller 3D tiene su propia escena y no usa el museo: sus gestos van aparte (actualizarTaller).
     if (modoApp === 'taller') actualizarTaller(lectura);
     else if (lectura.listo && lectura.hayDatos && !enCinematica) aplicarLectura(sesion, lectura);
@@ -799,11 +814,47 @@ function pasoPendiente(sesion: Sesion): ClaveTexto | null {
   return null;
 }
 
+/** ¿Pide la caja juntar el pulgar y el índice ahora? */
+function pidePellizco(): boolean {
+  return modoControl === 'camara' && pasoActual !== null && PASOS_PELLIZCO.includes(pasoActual);
+}
+
+/** Mientras suena la explicación de los controles (la primera vez al subirte), ni B ni el pellizco bajan del LRV. */
+function bajadaBloqueada(): boolean {
+  return mentorHablando && habla?.clave === 'luna_sentado_en_LRV';
+}
+
+/**
+ * Llenado de la bolita del OK (cámara), o null para ocultarla. Sale cuando juntar el pulgar y el índice hace algo: en
+ * la misión lunar, al subir al LRV (ya desplegado y explicado) y al bajarse, con el pellizco de la mano izquierda; fuera
+ * de la misión, cuando la caja lo pide.
+ */
+function progresoBolitaOk(sesion: Sesion, lectura: LecturaEntrada): number | null {
+  if (modoControl !== 'camara' || !lectura.listo || !lectura.hayDatos || modoApp === 'taller') return null;
+  if (mision !== null) {
+    if (sesion.museo.pantalla.tipo !== 'mision' || sesion.museo.enTransicion || mision.bloqueada) return null;
+    if (!mision.aPie) return bajadaBloqueada() ? null : lectura.progresoOkManoLibre;
+    return subidaLista && despliegue?.desplegado === true ? lectura.progresoOkManoLibre : null;
+  }
+  return pidePellizco() ? lectura.progresoPellizco : null;
+}
+
+/**
+ * Dedo (px) que puede señalar un botón (volver al menú en la misión, o el del taller), con cámara. Null en cualquier
+ * otro caso: el helper de botones (ui/botonesSenalables.ts) entonces suelta lo que tuviera lleno.
+ */
+function dedoParaBotones(sesion: Sesion, lectura: LecturaEntrada): { x: number; y: number } | null {
+  const senal = lectura.senal;
+  if (modoControl !== 'camara' || !lectura.listo || !lectura.hayDatos || senal?.tipo !== 'cursor' || !senal.activo) return null;
+  const enMision = mision !== null && sesion.museo.pantalla.tipo === 'mision' && !sesion.museo.enTransicion && !cinematicaActiva();
+  if (!enMision && modoApp !== 'taller') return null;
+  return { x: senal.x * window.innerWidth, y: senal.y * window.innerHeight };
+}
+
 /** Pone en la caja el paso pendiente (con el texto del idioma y del control activos). */
 function mostrarPaso(sesion: Sesion): void {
   pasoActual = pasoPendiente(sesion);
-  const pellizco = modoControl === 'camara' && pasoActual !== null && PASOS_PELLIZCO.includes(pasoActual);
-  sesion.instruccion.mostrar(pasoActual === null ? null : texto(pasoActual), pellizco ? 'pellizco' : null);
+  sesion.instruccion.mostrar(pasoActual === null ? null : texto(pasoActual), pidePellizco() ? 'pellizco' : null);
 }
 
 /** Estado que persiste entre fotogramas. */
@@ -1091,7 +1142,7 @@ function aplicarLectura(sesion: Sesion, lectura: LecturaEntrada): void {
   const apuntando = senalar(sesion, lectura.senal);
 
   // Escena lunar: caminata, palanca del mando y aplauso van a la máquina de estados (SPEC 8).
-  // A pie, el jugador camina y mira como en el museo; sentado, la palanca mueve el LRV y el giro solo la vista.
+  // A pie, el jugador camina y mira como en el museo; sentado, la palanca mueve el LRV y la vista va fija al frente.
   if (mision !== null) {
     const aPie = mision.aPie;
     // Misión cumplida: se puede mirar alrededor, pero no caminar (ni de lado).
@@ -1103,10 +1154,9 @@ function aplicarLectura(sesion: Sesion, lectura: LecturaEntrada): void {
     }
     const volver = volverPedido;
     volverPedido = false;
-    // Mientras suena la explicación de los controles (la primera vez al subirte), ni B ni el aplauso bajan del LRV.
-    // Con cámara el aplauso llega también como confirmar: sentado se ignora entero, para no volver al museo.
-    const bajadaBloqueada = mentorHablando && habla?.clave === 'luna_sentado_en_LRV';
-    const okSentadoIgnorado = !aPie && lectura.bajarse && bajadaBloqueada;
+    // Con cámara, subir al LRV y bajarse es el pellizco de la mano que no conduce (la izquierda, `okManoLibre`); el
+    // de la derecha, que lleva la palanca, no hace nada en la misión. Con teclado, espacio sube y B baja.
+    const subir = modoControl === 'camara' ? lectura.okManoLibre : lectura.aplauso;
     // Sentado, la palanca acelera el LRV solo cuando la voz ya explicó cómo conducir; antes solo gira las ruedas.
     const mando = conduccionLista || lectura.mando === null ? lectura.mando : { adelante: 0, lado: lectura.mando.lado };
     aplicarLuna(
@@ -1114,13 +1164,14 @@ function aplicarLectura(sesion: Sesion, lectura: LecturaEntrada): void {
       {
         ahoraS,
         dtS: lectura.dtS,
-        // A pie con el LRV ya desplegado, el aplauso no sube hasta que la voz diga cómo hacerlo.
-        aplauso: lectura.aplauso && !okSentadoIgnorado && (!aPie || subidaLista || despliegue?.desplegado !== true),
-        aplausoVuelve: lectura.aplausoVuelve,
+        // A pie con el LRV ya desplegado, no se sube hasta que la voz diga cómo hacerlo. Sentado, confirmar no hace nada.
+        aplauso: aPie && subir && (subidaLista || despliegue?.desplegado !== true),
+        // El pellizco ya no vuelve al museo: en la misión, la vuelta es el botón «Volver al menú» (señalado o con clic).
+        aplausoVuelve: false,
         volver,
         mando,
         jugador: visual.museo.posicionJugador(),
-        bajarse: lectura.bajarse && !bajadaBloqueada,
+        bajarse: lectura.bajarse && !bajadaBloqueada(),
         lrvDesplegado: despliegue?.desplegado ?? true,
       },
       lectura.mando,
@@ -1174,7 +1225,8 @@ function actualizarVolver(sesion: Sesion, lectura: LecturaEntrada, enCinematica:
   const previo = ultimoVolverS;
   ultimoVolverS = lectura.ahoraS;
   const dtS = previo === null ? 0 : Math.min(DT_MAX_DESPLIEGUE_S, Math.max(0, lectura.ahoraS - previo));
-  const mantenida = cargaMantenida(lectura);
+  // Volver se mantiene con la E (teclado). Con cámara, el puño ya no vuelve: sirve el botón «Volver al menú».
+  const mantenida = lectura.desplegarMantenido;
   if (!mantenida) volverArmado = true;
   const enMision = museo.pantalla.tipo === 'mision' && !enCinematica && !museo.enTransicion;
   const ocupada =
@@ -1340,7 +1392,7 @@ function aplicarLuna(sesion: Sesion, entrada: EntradaLuna, mandoVisto: PosicionM
       // Desplegándose, el mentor ya va contando el despliegue: no se le interrumpe.
       if (despliegue?.estado === 'plegado') decirFrase(sesion.voz, sesion.ui, 'luna_LRV_plegado');
     } else if (evento.tipo === 'volver') {
-      sesion.museo.volver();
+      sesion.museo.volverAModos();
     }
   }
 }
@@ -1360,6 +1412,12 @@ function senalar(sesion: Sesion, senal: Senal | null): string | null {
     } else {
       cursorUi.mostrar(false);
     }
+    return null;
+  }
+  // En la misión, con cámara, el dedo solo sirve para señalar «Volver al menú»: se muestra el cursor para verlo.
+  if (modoControl === 'camara' && sesion.museo.pantalla.tipo === 'mision' && senal?.tipo === 'cursor') {
+    cursorUi.mostrar(true);
+    cursorUi.mover(senal.x, senal.y, !senal.activo);
     return null;
   }
   if (sesion.museo.pantalla.tipo !== 'museo' || senal === null) {

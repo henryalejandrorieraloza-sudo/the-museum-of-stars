@@ -94,6 +94,12 @@
   z-index: 4;
 }
 
+/* Solo el botón «Volver al menú» (misión lunar): la barra se ajusta a él, centrada arriba. */
+.mision.mision-solo-boton {
+  width: max-content;
+  padding: 6px;
+}
+
 .mision h1 {
   margin: 0;
   font-size: clamp(18px, 3.5vw, 26px);
@@ -169,6 +175,17 @@
   place-items: center;
   color: #fff;
   font: 700 24px system-ui, sans-serif;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* Anillo del pellizco (ui/anillo.ts): el 👌 en el centro. */
+.anillo-ok {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 26px;
+  line-height: 1;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
 
