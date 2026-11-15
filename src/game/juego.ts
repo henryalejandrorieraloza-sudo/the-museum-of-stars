@@ -1253,14 +1253,24 @@ function senalar(sesion: Sesion, senal: Senal | null): string | null {
   if (modoControl === 'teclado') {
     const vitrina = senal.activo ? visual.museo.vitrinaEnPantalla(senal.x, senal.y) : null;
     const mantenida = vitrina !== null && sesion.museo.vitrinaSeleccionada === null;
-    // Con el teclado, señalar se hace con el clic: el anillo lleva un ratón, no la E.
+    // Con el teclado, señalar se hace con el clic: el anillo lleva un ratón, no la E. Va en el centro (la mira).
+    anillo.situar(null);
     anillo.mostrar(mantenida ? sesion.museo.progresoSenalar : null, 'clic');
     cursorUi.mostrar(!mantenida);
     cursorUi.mover(senal.x, senal.y, true);
     return vitrina;
   }
-  // Cursor: sigue la punta del índice (cámara) o es la mira del centro (teclado). Atenuado, no señala.
+  // Cursor: sigue la punta del índice (cámara). Atenuado, no señala. Mientras se señala una vitrina, el anillo se llena
+  // bajo la punta del dedo, igual que con el clic del teclado, hasta seleccionarla.
   cursorUi.mostrar(true);
   cursorUi.mover(senal.x, senal.y, !senal.activo);
-  return senal.activo ? visual.museo.vitrinaEnPantalla(senal.x, senal.y) : null;
+  const vitrina = senal.activo ? visual.museo.vitrinaEnPantalla(senal.x, senal.y) : null;
+  if (vitrina !== null && sesion.museo.vitrinaSeleccionada === null) {
+    anillo.situar({ x: senal.x * window.innerWidth, y: senal.y * window.innerHeight });
+    anillo.mostrar(sesion.museo.progresoSenalar, 'clic');
+  } else {
+    anillo.situar(null);
+    anillo.mostrar(null);
+  }
+  return vitrina;
 }

@@ -10,6 +10,8 @@ export interface AnilloUi {
   mostrar(progreso: number | null, simbolo?: SimboloAnillo): void;
   /** Lo que va dentro del anillo por defecto: la tecla E (teclado) o un puño cerrado (cámara). */
   fijarSimbolo(simbolo: 'tecla' | 'puno'): void;
+  /** Lo coloca en un punto de la pantalla (px); con null vuelve al centro. */
+  situar(punto: { x: number; y: number } | null): void;
 }
 
 /**
@@ -27,6 +29,10 @@ export function crearAnillo(): AnilloUi {
   return {
     fijarSimbolo(tipo) {
       base = tipo;
+    },
+    situar(punto) {
+      el.style.left = punto ? `${punto.x}px` : '';
+      el.style.top = punto ? `${punto.y}px` : '';
     },
     mostrar(progreso, simbolo = base) {
       const p = progreso === null ? null : Math.min(1, Math.max(0, progreso));
