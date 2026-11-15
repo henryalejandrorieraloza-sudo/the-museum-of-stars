@@ -1,5 +1,7 @@
 # Museo Espacial Interactivo (Beta)
 
+**Jugar:** https://henryalejandrorieraloza-sudo.github.io/the-museum-of-stars/ (Chrome o Edge; la cámara pide permiso).
+
 Un museo web que se controla con el cuerpo, usando solo la webcam del computador (o con teclado y ratón si no hay cámara). Recorres el museo, eliges artefactos históricos y vives dos misiones simuladas:
 
 - **Luna, Apollo 17 (1972):** conduces el rover lunar LRV en Taurus-Littrow, recoges una muestra y vuelves al módulo lunar.
@@ -57,29 +59,31 @@ El juego ofrece dos formas de control. Se elige al inicio y se recuerda al recar
 
 ### Modo cámara
 
-| Acción                          | Gesto                                                    |
-| ------------------------------- | -------------------------------------------------------- |
-| Caminar por el museo            | Subir las rodillas (caminar en el sitio)                 |
-| Girar la vista                  | Inclinar la cabeza hacia un lado                         |
-| Mirar arriba o abajo            | Subir o bajar la cabeza                                  |
-| Señalar una vitrina             | Cursor con el dedo índice                                |
-| Entrar a la misión              | Aplaudir                                                 |
-| Conducir el LRV                 | Volante con las dos manos; avanzar con las rodillas      |
-| Seleccionar una muestra         | Cursor con una mano y pellizco                           |
-| Recoger una muestra             | Golpe con una mano y agarre con la otra                  |
-| Volver al museo                 | Aplaudir                                                 |
+| Acción                                 | Gesto                                                              |
+| -------------------------------------- | ------------------------------------------------------------------ |
+| Caminar                                | Subir las rodillas (caminar en el sitio)                           |
+| Girar la vista                         | Inclinar la cabeza hacia un lado                                   |
+| Mirar arriba o abajo                   | Subir o bajar la cabeza                                            |
+| Elegir una vitrina o una opción        | Señalarla con el dedo índice 1,5 s                                 |
+| Entrar                                 | Juntar el pulgar y el índice (👌) un momento                       |
+| Desplegar el LRV y recoger la muestra  | Mantener el puño cerrado                                           |
+| Subir al LRV y bajarse                 | 👌 con la mano izquierda                                           |
+| Conducir el LRV                        | Mano derecha adelante, atrás y a los lados (la vista va fija)      |
+| Volver al menú                         | Señalar «Volver al menú» 1,5 s                                     |
 
 ### Modo teclado y ratón
 
-| Acción                          | Control                              |
-| ------------------------------- | ------------------------------------ |
-| Moverse                         | W A S D                              |
-| Mirar                           | Ratón                                |
-| Entrar a la vitrina, subir al LRV | Espacio                            |
-| Señalar, golpear y agarrar      | E o clic izquierdo (agarrar: E otra vez) |
-| Volver al museo (misión)        | Mantener E                           |
-| Salir o cancelar                | Esc                                  |
-| Desplegar el LRV (Apollo 17)    | Mantener E durante 3 s               |
+| Acción                                 | Control                              |
+| -------------------------------------- | ------------------------------------ |
+| Moverse                                | W A S D                              |
+| Mirar                                  | Ratón (clic en la escena)            |
+| Elegir una vitrina o una opción        | Mantener el clic sobre ella 1,5 s    |
+| Entrar, subir al LRV                   | Espacio                              |
+| Desplegar el LRV y recoger la muestra  | Mantener E                           |
+| Conducir el LRV                        | W A S D                              |
+| Bajarse del LRV                        | B                                    |
+| Volver al menú                         | M o clic en «Volver al menú»         |
+| Opciones                               | Esc                                  |
 
 Las reglas de giro y de velocidad (zona muerta, sensibilidad y velocidad máxima) están en [SPEC.md](./SPEC.md), §4. Se pueden ajustar en el menú de opciones.
 
@@ -94,7 +98,7 @@ Las reglas de giro y de velocidad (zona muerta, sensibilidad y velocidad máxima
 | Misión lunar (Apollo 17)                            | Implementado. Falta prueba con navegador y cámara reales      |
 | Misión marciana (Perseverance)                      | Pendiente                                                     |
 | Mentor y voz                                        | En curso                                                      |
-| Publicación                                         | Pendiente                                                     |
+| Publicación                                         | GitHub Pages, en cada push a `main`                           |
 
 El detalle completo está en la sección 14 de [SPEC.md](./SPEC.md).
 
@@ -112,9 +116,11 @@ El detalle completo está en la sección 14 de [SPEC.md](./SPEC.md).
 npm run build
 ```
 
-Sube el contenido de `dist/` a cualquier hosting estático con HTTPS (GitHub Pages, Netlify, Vercel, Cloudflare Pages, etc.). `dist/` incluye los modelos y los binarios WASM de MediaPipe, así que el servidor no necesita nada más.
+El repositorio se publica solo en GitHub Pages con cada push a `main` (`.github/workflows/pages.yml`, que construye con `BASE_PATH=/the-museum-of-stars/`).
 
-Si la página se publica en una subruta (por ejemplo `https://usuario.github.io/museo-espacial/`), cambia `base` en `vite.config.ts` a `'/museo-espacial/'` antes de hacer el build.
+Para otro hosting, sube el contenido de `dist/` a cualquier hosting estático con HTTPS (GitHub Pages, Netlify, Vercel, Cloudflare Pages, etc.). `dist/` incluye los modelos y los binarios WASM de MediaPipe, así que el servidor no necesita nada más.
+
+Si la página se publica en una subruta (por ejemplo `https://usuario.github.io/museo-espacial/`), construye con `BASE_PATH=/museo-espacial/ npm run build`.
 
 ## Estructura
 

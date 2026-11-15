@@ -41,7 +41,7 @@ Per-frame flow: `juego.ts` loop → tracker → `procesarFotograma` → gesture/
 ## Project documents
 
 - `SPEC.md` (in Spanish) is the authoritative product spec. It defines the gesture mapping, the flow of a museum artifact, the historical-accuracy rules, and the implementation checklist (section 14). Check it before changing gesture behavior or game flow, and update its checklist when a feature becomes done.
-- `README.md` (in Spanish) covers deployment. Hosting needs a static host with HTTPS. If the site moves to a subpath, change `base` in `vite.config.ts` as well.
+- `README.md` (in Spanish) covers deployment. Hosting needs a static host with HTTPS. GitHub Pages publishes every push to `main` of the-museum-of-stars (`.github/workflows/pages.yml`) under `/the-museum-of-stars/`; `base` in `vite.config.ts` comes from the `BASE_PATH` env var (default `/`).
 
 ## Conventions specific to this repo
 

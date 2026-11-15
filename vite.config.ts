@@ -26,8 +26,9 @@ const debugRedirectPlugin = (): Plugin => ({
 });
 
 export default defineConfig({
-  // Cambia a la subruta si se publica en un subdirectorio, p. ej. '/museo-espacial/'.
-  base: '/',
+  // Subruta de publicación. GitHub Pages la pasa en BASE_PATH ('/the-museum-of-stars/', ver .github/workflows/pages.yml);
+  // en local es la raíz.
+  base: process.env.BASE_PATH ?? '/',
   plugins: [debugRedirectPlugin()],
   build: {
     rollupOptions: {
