@@ -30,6 +30,11 @@ const MARGEN_VIGILANCIA_MS = 5000;
  * así nunca se queda una frase sin texto. Es mayor que ESPERA_INICIO_FRASE_MS para dar tiempo al reintento.
  */
 const ESPERA_SUBTITULO_SIN_AVISO_MS = 3200;
+/**
+ * Tiempo mínimo (ms) entre dos reinicios de la frase que suena al cambiar el volumen. El deslizador manda muchos
+ * cambios seguidos; así la frase no se corta a cada movimiento, y el último valor siempre llega.
+ */
+const INTERVALO_REINICIO_VOLUMEN_MS = 300;
 
 
 export interface Voz {
@@ -47,6 +52,12 @@ export interface Voz {
   escuchar(oyente: OyenteVoz): void;
   /** Pausa o reanuda la voz (tecla 7). Mientras está pausada, no avanzan las frases ni sus temporizadores. */
   pausar(pausado: boolean): void;
+  /**
+   * Volumen de la voz (0–1). Con una frase sonando, esta se reinicia desde la palabra que suena con el volumen nuevo
+   * (la voz no cambia); el reinicio va como mucho cada 300 ms mientras se mueve el deslizador. Con una línea grabada
+   * sonando, cambia al momento. Si la voz del navegador ignora el volumen, no puede cambiar.
+   */
+  fijarVolumen(volumen: number): void;
 }
 
 /** Divide un texto en frases, conservando el signo de puntuación final. */
@@ -79,6 +90,17 @@ export function duracionRespaldoMs(frase: string): number {
   return Math.round((frase.length / CARACTERES_POR_SEGUNDO) * 1000);
 }
 
+/**
+ * Dónde seguir una frase cortada en el carácter `pos`: justo ahí, para que siga de corrido y no se repita nada. Si
+ * `pos` cae en un espacio, se avanza al carácter siguiente que no sea espacio. Devuelve `texto.length` si ya no queda
+ * nada que decir.
+ */
+export function reanudarEn(texto: string, pos: number): number {
+  let i = Math.min(texto.length, Math.max(0, pos));
+  while (i < texto.length && /\s/.test(texto[i])) i++;
+  return i;
+}
+
 /** Estado de una frase de la explicación: si ya empezó, terminó o falló, y si el navegador envía eventos de palabra. */
 interface EstadoFrase {
   utterance?: SpeechSynthesisUtterance;
@@ -87,6 +109,12 @@ interface EstadoFrase {
   comenzada: boolean;
   conEventosDePalabra: boolean;
   fallo: boolean;
+  /** Carácter de `frase.texto` desde el que se lee: 0, salvo si la frase se reinició por un cambio de volumen. */
+  desde: number;
+  /** Dónde va la voz: carácter de `frase.texto` en el momento (ms) de la última marca, o del inicio. */
+  ancla?: { caracter: number; ms: number };
+  /** Momento (ms) en que empezó a sonar esta frase, para medir el ritmo de la voz. */
+  inicioMs?: number;
 }
 
 /** `idioma` puede ser una función: se lee al hablar cada frase, para que el cambio de idioma se note al momento. */
@@ -107,6 +135,17 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
   let enPausa = false;
   /** Temporizador pendiente de la frase (para volver a programarlo al reanudar). */
   let pendiente: { ms: number; fn: () => void } | undefined;
+  /** Volumen (0–1) de la voz y de las líneas grabadas. Lo fija el panel de opciones. */
+  let volumen = 1;
+  /** Reinicia la frase en curso con el volumen actual (lo define `hablar` para cada explicación). */
+  let reiniciarFrase: (() => void) | undefined;
+  /** Hubo un cambio de volumen en pausa: se reinicia la frase al reanudar. */
+  let reiniciarPendiente = false;
+  /** Temporizador del próximo reinicio por volumen, o undefined si no hay ninguno programado. */
+  let temporizadorVolumen: number | undefined;
+  let ultimoReinicioMs = Number.NEGATIVE_INFINITY;
+  /** Ritmo de la voz (caracteres por segundo), medido con las frases que ya sonaron. */
+  let caracteresPorSegundo = CARACTERES_POR_SEGUNDO;
 
   const detener = (): void => {
     window.clearTimeout(temporizador);
@@ -135,6 +174,35 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
     }
   };
 
+  /**
+   * Programa el reinicio de la frase que suena con el volumen actual, como mucho uno cada INTERVALO_REINICIO_VOLUMEN_MS.
+   * Si llegan más cambios mientras espera, el reinicio lee el volumen que haya en ese momento.
+   */
+  const programarReinicioVolumen = (): void => {
+    if (temporizadorVolumen !== undefined) return;
+    const espera = Math.max(0, INTERVALO_REINICIO_VOLUMEN_MS - (performance.now() - ultimoReinicioMs));
+    temporizadorVolumen = window.setTimeout(() => {
+      temporizadorVolumen = undefined;
+      ultimoReinicioMs = performance.now();
+      reiniciarFrase?.();
+    }, espera);
+  };
+
+  /** Carácter de `texto` que se está diciendo ahora: el de la última marca más lo que avanza el reloj al ritmo medido. */
+  const posicionActual = (e: EstadoFrase, texto: string): number => {
+    const ancla = e.ancla ?? { caracter: e.desde, ms: performance.now() };
+    const pos = ancla.caracter + ((performance.now() - ancla.ms) / 1000) * caracteresPorSegundo;
+    return Math.min(texto.length, Math.floor(pos));
+  };
+
+  /** Ajusta el ritmo con una frase que acaba de sonar. Las muy cortas o muy rápidas no cuentan. */
+  const medirRitmo = (e: EstadoFrase, caracteres: number): void => {
+    if (e.inicioMs === undefined) return;
+    const segundos = (performance.now() - e.inicioMs) / 1000;
+    if (segundos < 0.8 || caracteres < 10) return;
+    caracteresPorSegundo = 0.5 * caracteresPorSegundo + 0.5 * (caracteres / segundos);
+  };
+
   return {
     escuchar(nuevo) {
       oyente = nuevo;
@@ -161,7 +229,17 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
           const p = pendiente;
           programar(p.ms, p.fn);
         }
+        if (reiniciarPendiente) {
+          reiniciarPendiente = false;
+          programarReinicioVolumen();
+        }
       }
+    },
+    fijarVolumen(nuevo) {
+      volumen = Number.isFinite(nuevo) ? Math.min(1, Math.max(0, nuevo)) : 1;
+      grabada?.fijarVolumen(volumen);
+      if (enPausa) reiniciarPendiente = true;
+      else programarReinicioVolumen();
     },
     hablar(texto, alTerminar, alFrase) {
       const id = ++vigente;
@@ -244,24 +322,28 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
        * Envía la frase n a la cola de la síntesis. Puede llamarse antes de que la frase sea vigente: el navegador
        * la encadena tras la anterior sin esperar a nuestro evento de fin. Devuelve false si no hay voz.
        */
-      const enviar = (n: number): boolean => {
+      const enviar = (n: number, desde = 0, previa?: EstadoFrase): boolean => {
         if (!sintesis || !hayVoces()) return false;
         const frase = trozos[n];
+        // `desde` es el carácter desde el que se lee (0 salvo en un reinicio por volumen). `previa` conserva lo que
+        // ya pasó (subtítulo y gestos) para no volver a mostrarlo.
         const e: EstadoFrase = {
-          empezada: false,
+          empezada: previa?.empezada ?? false,
           hecha: false,
           comenzada: false,
-          conEventosDePalabra: false,
+          conEventosDePalabra: previa?.conEventosDePalabra ?? false,
           fallo: false,
+          desde,
         };
         estados.set(n, e);
         try {
-          const utterance = new SpeechSynthesisUtterance(frase.texto);
+          const utterance = new SpeechSynthesisUtterance(frase.texto.slice(desde));
           const lang = typeof idioma === 'function' ? idioma() : idioma;
           utterance.lang = lang;
           // Ritmo algo más pausado y tono ligeramente bajo: suena menos apresurado y más de personaje.
           utterance.rate = RITMO_VOZ;
           utterance.pitch = TONO_VOZ;
+          utterance.volume = volumen;
           const elegida = elegirVoz(sintesis.getVoices(), lang);
           if (elegida) utterance.voice = elegida;
           e.utterance = utterance;
@@ -269,21 +351,28 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
           utterance.onstart = () => {
             if (estados.get(n) !== e || id !== vigente) return;
             e.comenzada = true;
+            e.inicioMs = performance.now();
+            e.ancla = { caracter: desde, ms: e.inicioMs };
             iniciar(n);
             // Si en 0.7 s no ha llegado ningún evento de palabra, este navegador no los envía: se estima.
             temporizadoresCue.push(
               window.setTimeout(() => {
-                if (id === vigente && estados.get(n) === e && !e.conEventosDePalabra) programarEstimados(n, 700);
+                if (desde === 0 && id === vigente && estados.get(n) === e && !e.conEventosDePalabra) {
+                  programarEstimados(n, 700);
+                }
               }, 700),
             );
           };
           utterance.onboundary = (ev) => {
             if (estados.get(n) !== e || id !== vigente || (ev.name && ev.name !== 'word')) return;
             e.conEventosDePalabra = true;
-            sync.palabra(palabraEn(frase.inicio + ev.charIndex));
+            e.ancla = { caracter: desde + ev.charIndex, ms: performance.now() };
+            sync.palabra(palabraEn(frase.inicio + e.ancla.caracter));
           };
           utterance.onend = () => {
-            if (estados.get(n) === e) terminarFrase(n);
+            if (estados.get(n) !== e) return;
+            medirRitmo(e, frase.texto.length - desde);
+            terminarFrase(n);
           };
           // Un error no debe dejar el flujo parado: la frase pasa a leerse por temporizador.
           utterance.onerror = (ev) => {
@@ -317,6 +406,8 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
           respaldo(n);
           return;
         }
+        // Sin marcas ni aviso de inicio, la voz se supone en el carácter 0 desde que la frase pasa a ser la vigente.
+        e.ancla ??= { caracter: 0, ms: performance.now() };
 
         // Si la frase no ha empezado a sonar, se cancela la cola y se vuelve a enviar (una sola vez).
         temporizadoresCue.push(
@@ -339,6 +430,55 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
         // La siguiente frase entra ya en la cola del navegador: al terminar esta, suena sin silencio.
         if (indice < trozos.length && !estados.has(indice)) enviar(indice);
       };
+
+      /**
+       * Cambio de volumen con una frase sonando. El navegador no cambia el volumen de una frase en curso, así que se
+       * cancela la cola y se vuelve a pedir lo que falta de la frase, desde la palabra que suena, con el volumen nuevo;
+       * detrás va la siguiente. La voz es la misma y no se repite lo ya dicho. Si esa voz ignora el volumen, tampoco
+       * cambia aquí.
+       */
+      const reiniciarActual = (): void => {
+        if (id !== vigente || actual < 0 || !sintesis) return;
+        if (enPausa) {
+          reiniciarPendiente = true;
+          return;
+        }
+        const previa = estados.get(actual);
+        if (!previa?.utterance || previa.hecha || previa.fallo) return;
+        const n = actual;
+        const textoFrase = trozos[n].texto;
+        const desde = reanudarEn(textoFrase, posicionActual(previa, textoFrase));
+        const siguienteN = n + 1;
+        const haySiguiente = siguienteN < trozos.length && estados.has(siguienteN);
+        // Las entradas viejas salen de `estados` antes de cancelar: sus eventos (también el de fin) dejan de contar.
+        estados.delete(n);
+        if (haySiguiente) estados.delete(siguienteN);
+        detener();
+        try {
+          sintesis.cancel();
+        } catch {
+          // Sin cancelación, las frases viejas siguen sonando, pero ya no pueden avanzar la explicación.
+        }
+        // Chrome puede descartar una frase lanzada justo después de cancel(): se deja un instante, como al empezar.
+        window.setTimeout(() => {
+          if (id !== vigente) return;
+          if (desde >= textoFrase.length) {
+            // Ya se dijo todo: la frase acaba aquí y la siguiente sale con el volumen nuevo.
+            estados.set(n, { ...previa, hecha: false });
+            terminarFrase(n);
+            return;
+          }
+          if (!enviar(n, desde, previa)) {
+            siguiente();
+            return;
+          }
+          const nueva = estados.get(n);
+          if (nueva && !nueva.ancla) nueva.ancla = { caracter: desde, ms: performance.now() };
+          if (haySiguiente) enviar(siguienteN);
+          programar(duracionRespaldoMs(textoFrase.slice(desde)) + MARGEN_VIGILANCIA_MS, () => terminarFrase(n));
+        }, RETRASO_TRAS_CANCELAR_MS);
+      };
+      reiniciarFrase = reiniciarActual;
 
       const empezarConSintesis = (): void => {
         try {
@@ -391,6 +531,7 @@ export function crearVoz(idioma: string | (() => string) = 'es-ES', catalogo?: C
             grabada = undefined;
             empezarConSintesis();
           },
+          volumen,
         );
         return;
       }

@@ -101,11 +101,14 @@ export interface Reproduccion {
   cancelar(): void;
   /** Pausa o reanuda el audio (tecla 7). */
   pausar(pausado: boolean): void;
+  /** Cambia el volumen (0–1) mientras suena. */
+  fijarVolumen(volumen: number): void;
 }
 
 /**
  * Reproduce `linea` y sincroniza `sync` con su tiempo. `alFinal` se llama al acabar el audio; `alFallo`, si no se
  * pudo cargar o reproducir (quien llama pasa entonces a la síntesis). Nunca deja el flujo parado: hay vigilancia.
+ * `volumen` va de 0 a 1.
  */
 export function reproducirLinea(
   linea: LineaGrabada,
@@ -114,6 +117,7 @@ export function reproducirLinea(
   oyente: () => OyenteVoz,
   alFinal: () => void,
   alFallo: () => void,
+  volumen = 1,
 ): Reproduccion {
   const audio = new Audio();
   audio.preload = 'auto';
@@ -126,7 +130,9 @@ export function reproducirLinea(
   let ultimaVigilanciaMs = 0;
 
   // Amplitud real con AnalyserNode. Si el navegador no lo permite, el audio suena igual y los LED usan su pulso propio.
+  // El volumen pasa por un GainNode dentro de esa cadena; sin ella, es el volumen del propio elemento.
   let analizador: AnalyserNode | null = null;
+  let ganancia: GainNode | null = null;
   let datos: Uint8Array<ArrayBuffer> | null = null;
   try {
     contexto ??= new (window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
@@ -134,16 +140,24 @@ export function reproducirLinea(
     analizador = contexto.createAnalyser();
     analizador.fftSize = 512;
     datos = new Uint8Array(analizador.fftSize);
+    ganancia = contexto.createGain();
     let fuente = fuentes.get(audio);
     if (!fuente) {
       fuente = contexto.createMediaElementSource(audio);
       fuentes.set(audio, fuente);
     }
-    fuente.connect(analizador);
+    fuente.connect(ganancia);
+    ganancia.connect(analizador);
     analizador.connect(contexto.destination);
   } catch {
     analizador = null;
+    ganancia = null;
   }
+  const aplicarVolumen = (v: number): void => {
+    if (ganancia) ganancia.gain.value = v;
+    else audio.volume = v;
+  };
+  aplicarVolumen(volumen);
 
   const limpiar = (): void => {
     vivo = false;
@@ -218,6 +232,9 @@ export function reproducirLinea(
   return {
     cancelar() {
       if (vivo) limpiar();
+    },
+    fijarVolumen(nuevo: number) {
+      if (vivo) aplicarVolumen(nuevo);
     },
     pausar(pausado: boolean) {
       if (!vivo) return;
