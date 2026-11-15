@@ -179,11 +179,33 @@
   display: none;
 }
 
-.anillo[data-simbolo='puno'] .anillo-tecla {
+.anillo[data-simbolo='puno'] .anillo-tecla,
+.anillo[data-simbolo='clic'] .anillo-tecla {
   display: none;
 }
 
 .anillo[data-simbolo='puno'] .anillo-puno {
+  display: block;
+}
+
+/* Señalar con el ratón (teclado): un ratón de línea en vez de la E. */
+.anillo .anillo-clic {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 30px;
+  height: 30px;
+  transform: translate(-50%, -50%);
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+  display: none;
+}
+
+.anillo[data-simbolo='clic'] .anillo-clic {
   display: block;
 }
 
@@ -1150,16 +1172,6 @@
   line-height: 1.4;
 }
 
-.modos-tecla {
-  position: absolute;
-  top: 16px;
-  right: 34px;
-  padding: 1px 8px;
-  background: rgba(255, 255, 255, 0.12);
-  color: var(--acento-claro);
-  font: 800 12px ui-monospace, 'SF Mono', Menlo, monospace;
-  clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
-}
 
 .modos-pista {
   margin: 4px 0 0;

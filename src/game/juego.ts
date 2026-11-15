@@ -426,6 +426,16 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
         // Si se salía de la exploración libre, la Luna vuelve a ser la de la misión.
         if (modoApp === 'libre') visual.museo.fijarLunaLibre(false);
         modoApp = null;
+        // M desde la presentación o una misión: se quita la capa de la presentación y se vuelve a la pantalla de modos.
+        if (presentacion) {
+          presentacion = null;
+          presUi.mostrar(false);
+          requireEl('ayuda').hidden = false;
+        }
+        if (evento.alMenu) {
+          void mostrarModos();
+          break;
+        }
         decirFrase(voz, ui, 'regreso_museo', undefined, true);
         break;
     }
@@ -568,12 +578,22 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
     tallerUi.abrir(tv);
   }
 
-  tallerUi.alSalir(() => {
+  /** Sale del taller 3D y vuelve a la pantalla de modos. */
+  function salirDelTaller(): void {
     tallerUi.cerrar();
     visual.museo.salirTaller();
     pausarEntrada('taller', false);
     modoApp = null;
     void mostrarModos();
+  }
+  tallerUi.alSalir(salirDelTaller);
+  // M: desde el taller 3D, una misión o la exploración libre, vuelve a la pantalla de modos. No actúa con Opciones,
+  // la pausa total ni la cinemática del despegue.
+  window.addEventListener('keydown', (ev) => {
+    if (ev.code !== 'KeyM' || ev.repeat || enCampoDeTexto(ev.target) || modoApp === null) return;
+    if (motivosPausaEntrada.has('opciones') || motivosPausaEntrada.has('total') || motivosPausaEntrada.has('cinematica')) return;
+    if (modoApp === 'taller') salirDelTaller();
+    else museo.volverAModos();
   });
   window.addEventListener('keydown', (ev) => {
     if (ev.code !== 'Digit7' || ev.repeat || enCampoDeTexto(ev.target)) return;
@@ -1171,12 +1191,13 @@ function senalar(sesion: Sesion, senal: Senal | null): string | null {
     anillo.mostrar(null);
     return senal.direccion ? visual.museo.vitrinaEnDireccion(senal.direccion) : null;
   }
-  // Con teclado, el anillo con la E solo aparece mientras se señala una vitrina (E o clic mantenidos sobre ella);
+  // Con teclado, el anillo solo aparece mientras se señala una vitrina (clic izquierdo mantenido sobre ella);
   // sin vitrina apuntada no sale nada y queda la mira.
   if (modoControl === 'teclado') {
     const vitrina = senal.activo ? visual.museo.vitrinaEnPantalla(senal.x, senal.y) : null;
     const mantenida = vitrina !== null && sesion.museo.vitrinaSeleccionada === null;
-    anillo.mostrar(mantenida ? sesion.museo.progresoSenalar : null);
+    // Con el teclado, señalar se hace con el clic: el anillo lleva un ratón, no la E.
+    anillo.mostrar(mantenida ? sesion.museo.progresoSenalar : null, 'clic');
     cursorUi.mostrar(!mantenida);
     cursorUi.mover(senal.x, senal.y, true);
     return vitrina;

@@ -243,8 +243,6 @@ export function crearTallerUi(): TallerUi {
     if (!abierto || !taller || ev.repeat || ev.ctrlKey || ev.metaKey || ev.altKey) return;
     if (ev.target instanceof HTMLElement && ev.target.closest('input[type="text"], select, textarea')) return;
     if (ev.code === 'KeyD') taller.alternar();
-    else if (ev.code === 'KeyF') taller.enfocar();
-    else if (ev.code === 'KeyM') salir();
   };
   window.addEventListener('keydown', alTecla);
   alCambiarIdioma(() => {

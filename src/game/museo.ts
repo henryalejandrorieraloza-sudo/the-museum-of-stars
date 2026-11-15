@@ -43,7 +43,8 @@ export type EventoMuseo =
   /** Empieza la presentación previa a la misión. `visible`: false si la escena 3D no se pudo montar. */
   | { tipo: 'presentacionAbierta'; mision: Mision; visible: boolean }
   | { tipo: 'misionAbierta'; mision: Mision }
-  | { tipo: 'regresoMuseo' };
+  /** `alMenu`: se vuelve a la pantalla de modos (tecla M) en vez de quedarse en el museo libre. */
+  | { tipo: 'regresoMuseo'; alMenu?: boolean };
 
 /**
  * Fase de la vitrina seleccionada (SPEC 7.2):
@@ -92,6 +93,8 @@ export class Museo {
    * salgan de ella (si no, seguir señalándola repetiría la explicación).
    */
   private recienExplicada: VitrinaId | null = null;
+  /** Vitrina del LRV con la que se entró a la pantalla de modos: M la vuelve a abrir desde la misión. */
+  private vitrinaModos: VitrinaId | null = null;
   private inicioCandidata = 0;
   /** Tiempo del último fotograma procesado: sirve para calcular el progreso de la selección. */
   private ultimoAhoraS = 0;
@@ -227,6 +230,7 @@ export class Museo {
     const id = this.seleccionada;
     if (this.transicion || this.fase !== 'modos' || id === null || MISION_DE[id] === null) return;
     const mision = MISION_DE[id];
+    this.vitrinaModos = id;
     this.iniciarTransicion(() => this.abrirPresentacion(mision));
   }
 
@@ -235,7 +239,19 @@ export class Museo {
     const id = this.seleccionada;
     if (this.transicion || this.fase !== 'modos' || id === null || MISION_DE[id] === null) return;
     const mision = MISION_DE[id];
+    this.vitrinaModos = id;
     this.iniciarTransicion(() => this.abrirMision(mision));
+  }
+
+  /**
+   * M durante la presentación o una misión (historia o exploración libre): vuelve al museo y abre otra vez la pantalla
+   * de modos, con la vitrina del LRV seleccionada.
+   */
+  volverAModos(): void {
+    const id = this.vitrinaModos;
+    if (this.transicion || id === null) return;
+    if (this.pantallaActual.tipo !== 'mision' && this.pantallaActual.tipo !== 'presentacion') return;
+    this.iniciarTransicion(() => this.completarVolverAModos(id));
   }
 
   /** Se cierra la pantalla de modos sin elegir nada: la vitrina se suelta y no se vuelve a elegir hasta dejar de señalarla. */
@@ -303,6 +319,17 @@ export class Museo {
     visual.museo.volverAlMuseo();
     visual.museo.mentorAparece();
     this.emitir({ tipo: 'regresoMuseo' });
+  }
+
+  /** Como completarVolver, pero la vitrina del LRV queda seleccionada en fase `modos` y juego.ts reabre la pantalla de modos. */
+  private completarVolverAModos(id: VitrinaId): void {
+    this.pantallaActual = { tipo: 'museo' };
+    this.candidata = null;
+    visual.museo.volverAlMuseo();
+    visual.museo.mentorAparece();
+    this.seleccionada = id;
+    this.fase = 'modos';
+    this.emitir({ tipo: 'regresoMuseo', alMenu: true });
   }
 
   private emitir(evento: EventoMuseo): void {

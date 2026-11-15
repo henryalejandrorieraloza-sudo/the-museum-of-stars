@@ -5,10 +5,12 @@
 //   A / D           paso lateral en el museo; volante del LRV en la misión lunar
 //   Ratón           mirar (pointer lock); equivale a inclinar y cabecear la cabeza
 //   Espacio         aplaudir: entrar a la vitrina y subir al LRV (ya no vuelve al museo)
-//   E o clic izq.   mantener para señalar la vitrina del centro de la pantalla; en la Luna, golpe y, con un
-//                   segundo toque, agarre de la muestra
+//   Clic izq.       mantener para señalar la vitrina del centro de la pantalla; en la Luna, golpe y, con un
+//                   segundo clic, agarre de la muestra
+//   E               en la Luna, golpe y, con un segundo toque, agarre de la muestra
 //   E mantenida     acción de carga: desplegar el LRV, recoger el suelo naranja o, si no hay otra cosa que cargar
 //                   en la misión, volver al museo (solo la tecla, no el clic)
+//   M               en una misión, el taller o la exploración libre, volver a la pantalla de modos
 //   Clic der.       pellizco y agarre
 //   B               bajarse del LRV (misión lunar)
 //   Esc             abrir Opciones
@@ -53,9 +55,10 @@ export class FuenteTeclado implements FuenteEntrada {
   private golpePendiente = false;
   private agarrePendiente = false;
   private bajarsePendiente = false;
-  /** Señalar: E o botón izquierdo mantenidos. */
-  private senalarTecla = false;
+  /** Señalar: botón izquierdo mantenido. */
   private senalarRaton = false;
+  /** E mantenida: la acción de carga (desplegar, recoger, volver al museo). */
+  private eMantenida = false;
   private pausada = false;
   private ultimoS: number | null = null;
   private soltadoMs = Number.NEGATIVE_INFINITY;
@@ -131,15 +134,15 @@ export class FuenteTeclado implements FuenteEntrada {
     this.ratonX = 0;
     this.ratonY = 0;
 
-    // Mira fija en el centro de la pantalla. Solo señala mientras E o el botón izquierdo están pulsados.
-    lectura.senal = { tipo: 'cursor', x: 0.5, y: 0.5, activo: this.senalarTecla || this.senalarRaton };
+    // Mira fija en el centro de la pantalla. Solo señala mientras el botón izquierdo está pulsado.
+    lectura.senal = { tipo: 'cursor', x: 0.5, y: 0.5, activo: this.senalarRaton };
     lectura.aplauso = this.espacioPendiente;
     lectura.aplausoVuelve = false;
     lectura.golpeHombrosS = this.golpePendiente ? GOLPE_TECLADO_HOMBROS_S : 0;
     lectura.pellizcoNuevo = this.agarrePendiente;
     lectura.agarreNuevo = this.agarrePendiente;
     lectura.bajarse = this.bajarsePendiente;
-    lectura.desplegarMantenido = this.senalarTecla;
+    lectura.desplegarMantenido = this.eMantenida;
     this.espacioPendiente = false;
     this.bajarsePendiente = false;
     this.golpePendiente = false;
@@ -200,7 +203,7 @@ export class FuenteTeclado implements FuenteEntrada {
         this.golpePendiente = true;
         this.agarrePendiente = true;
       }
-      this.senalarTecla = true;
+      this.eMantenida = true;
     } else if (ev.code === 'KeyB') {
       if (!ev.repeat) this.bajarsePendiente = true;
     } else if (TECLAS_MOVIMIENTO.has(ev.code)) {
@@ -210,7 +213,7 @@ export class FuenteTeclado implements FuenteEntrada {
 
   private alSoltar(codigo: string): void {
     this.pulsadas.delete(codigo);
-    if (codigo === 'KeyE') this.senalarTecla = false;
+    if (codigo === 'KeyE') this.eMantenida = false;
   }
 
   private alPulsarRaton(ev: MouseEvent): void {
@@ -230,7 +233,7 @@ export class FuenteTeclado implements FuenteEntrada {
 
   private soltarTodo(): void {
     this.pulsadas.clear();
-    this.senalarTecla = false;
+    this.eMantenida = false;
     this.senalarRaton = false;
   }
 }

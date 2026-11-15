@@ -32,7 +32,6 @@ const DIRECCION_INICIAL = new THREE.Vector3(0.62, 0.34, 0.7).normalize();
 const VELOCIDAD_ORBITA_RAD_S = 1.05;
 /** Ángulo mínimo al polo (rad): la cámara no pasa por encima ni por debajo del vehículo, donde la vista se voltea. */
 const MARGEN_POLO = 0.12;
-const DURACION_ENFOQUE_S = 0.6;
 /** Un clic es un pulsar y soltar casi sin moverse (px) y sin tardar (ms). */
 const CLIC_MAX_PX = 5;
 const CLIC_MAX_MS = 450;
@@ -78,8 +77,6 @@ export interface TallerVisual {
   /** Pone el desarme en `progreso` (0–1) a mano. */
   fijarProgreso(progreso: number): void;
   seleccionar(indice: number | null): void;
-  /** Enfoca la pieza elegida o, si no hay, el modelo entero. */
-  enfocar(): void;
   /** Deja visibles solo las piezas de un subsistema (null = todas). */
   resaltarGrupo(grupo: GrupoLRV | null): void;
   /** Gira la cámara despacio alrededor del modelo. */
@@ -93,7 +90,6 @@ export interface TallerVisual {
 }
 
 const _v = new THREE.Vector3();
-const _d = new THREE.Vector3();
 const _hsl = { h: 0, s: 0, l: 0 };
 const _c = new THREE.Color();
 
@@ -267,7 +263,6 @@ export function crearTallerVisual(renderer: THREE.WebGLRenderer): TallerVisual {
 
   // --- Cámara y teclado --------------------------------------------------------------------------------------
   const pulsadas = new Set<string>();
-  let enfoque: { desdeObj: THREE.Vector3; hastaObj: THREE.Vector3; desdePos: THREE.Vector3; hastaPos: THREE.Vector3; t: number } | null = null;
   let punteroSucio = false;
   let ultimoPuntero = { x: 0, y: 0 };
   let pulso: { x: number; y: number; ms: number } | null = null;
@@ -300,20 +295,6 @@ export function crearTallerVisual(renderer: THREE.WebGLRenderer): TallerVisual {
     punteroSucio = true;
   };
 
-  function enfocarEn(objetivo: THREE.Vector3, distancia: number): void {
-    if (!controles) return;
-    const dir = _d.subVectors(camara.position, controles.target);
-    if (dir.lengthSq() < 1e-6) dir.copy(DIRECCION_INICIAL);
-    dir.normalize();
-    enfoque = {
-      desdeObj: controles.target.clone(),
-      hastaObj: objetivo.clone(),
-      desdePos: camara.position.clone(),
-      hastaPos: objetivo.clone().addScaledVector(dir, distancia),
-      t: 0,
-    };
-  }
-
   const _desfase = new THREE.Vector3();
   const _derecha = new THREE.Vector3();
   const _arriba = new THREE.Vector3();
@@ -343,7 +324,6 @@ export function crearTallerVisual(renderer: THREE.WebGLRenderer): TallerVisual {
     _esfera.phi = THREE.MathUtils.clamp(_esfera.phi, MARGEN_POLO, Math.PI - MARGEN_POLO);
     _desfase.setFromSpherical(_esfera);
     camara.position.copy(controles.target).add(_desfase);
-    enfoque = null;
   }
 
   function limitarCamara(): void {
@@ -359,7 +339,6 @@ export function crearTallerVisual(renderer: THREE.WebGLRenderer): TallerVisual {
       controles.update();
     }
     camara.lookAt(0, 0, 0);
-    enfoque = null;
   }
 
   function proyectar(punto: THREE.Vector3): { x: number; y: number; visible: boolean } {
@@ -417,13 +396,6 @@ export function crearTallerVisual(renderer: THREE.WebGLRenderer): TallerVisual {
         mallas[i].position.set(base[i].x + d[0], base[i].y + d[1], base[i].z + d[2]);
       }
       moverConTeclas(dtS);
-      if (enfoque && controles) {
-        enfoque.t = Math.min(1, enfoque.t + dtS / DURACION_ENFOQUE_S);
-        const u = THREE.MathUtils.smootherstep(enfoque.t, 0, 1);
-        controles.target.lerpVectors(enfoque.desdeObj, enfoque.hastaObj, u);
-        camara.position.lerpVectors(enfoque.desdePos, enfoque.hastaPos, u);
-        if (enfoque.t >= 1) enfoque = null;
-      }
       controles?.update(dtS);
       limitarCamara();
       camara.updateMatrixWorld();
@@ -451,14 +423,6 @@ export function crearTallerVisual(renderer: THREE.WebGLRenderer): TallerVisual {
     },
     seleccionar(indice) {
       seleccionar(indice);
-    },
-    enfocar() {
-      if (elegida !== null) {
-        // Centra la pieza sin acercarse: la distancia no cambia.
-        enfocarEn(mallas[elegida].getWorldPosition(new THREE.Vector3()), DISTANCIA_CAMARA);
-      } else {
-        enfocarEn(new THREE.Vector3(0, 0, 0), DISTANCIA_CAMARA);
-      }
     },
     resaltarGrupo,
     girar(activo) {

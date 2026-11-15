@@ -1,7 +1,7 @@
 // Pantalla de modos, después de señalar el holograma del moon buggy y oír a Robi: arriba, «Elige cómo explorar» junto al moon
 // buggy, y tres cuadrantes low poly cuyos centros forman un triángulo (dos arriba y uno abajo en el centro): historia del
 // moon buggy, taller 3D y exploración libre, cada uno con su descripción breve. De fondo, un moon buggy recorre la Luna a lo lejos. Al pasar el cursor por un cuadrante (o enfocarlo con el teclado), Robi explica qué pasa si lo eliges;
-// el clic (o la tecla 1, 2 o 3) entra. La voz y los subtítulos los pone juego.ts a través de `alExplorar`.
+// el clic entra. Sin números en pantalla. La voz y los subtítulos los pone juego.ts a través de `alExplorar`.
 
 import { alCambiarIdioma, t, type ClaveTexto } from '../i18n';
 import { crearFondoLunar, type FondoLunar } from './fondoLunar';
@@ -28,10 +28,10 @@ const ICONO_CUBO =
 const ICONO_RUTA =
   '<svg viewBox="0 0 64 64" aria-hidden="true"><polygon points="4,58 24,18 34,18 22,58" class="t3"/><polygon points="24,18 34,18 40,58 22,58" class="t2"/><polygon points="34,18 46,18 60,58 40,58" class="t1"/><polygon points="29,24 31,24 32,30 28,30" class="t4"/><polygon points="28,40 32,40 33,48 27,48" class="t4"/><polygon points="44,6 50,12 44,18 38,12" class="t4"/></svg>';
 
-const MODOS: { modo: ModoApp; titulo: ClaveTexto; descripcion: ClaveTexto; tecla: string; icono: string }[] = [
-  { modo: 'historia', titulo: 'modo_historia_titulo', descripcion: 'modo_historia_desc', tecla: '1', icono: ICONO_BUGGY },
-  { modo: 'taller', titulo: 'modo_taller_titulo', descripcion: 'modo_taller_desc', tecla: '2', icono: ICONO_CUBO },
-  { modo: 'libre', titulo: 'modo_libre_titulo', descripcion: 'modo_libre_desc', tecla: '3', icono: ICONO_RUTA },
+const MODOS: { modo: ModoApp; titulo: ClaveTexto; descripcion: ClaveTexto; icono: string }[] = [
+  { modo: 'historia', titulo: 'modo_historia_titulo', descripcion: 'modo_historia_desc', icono: ICONO_BUGGY },
+  { modo: 'taller', titulo: 'modo_taller_titulo', descripcion: 'modo_taller_desc', icono: ICONO_CUBO },
+  { modo: 'libre', titulo: 'modo_libre_titulo', descripcion: 'modo_libre_desc', icono: ICONO_RUTA },
 ];
 
 function crear<K extends keyof HTMLElementTagNameMap>(tag: K, clase: string, hijos: (Node | string)[] = []): HTMLElementTagNameMap[K] {
@@ -55,11 +55,10 @@ export function crearModosUi(): ModosUi {
   let esVisible = false;
 
   function pintar(): void {
-    const cuadros = MODOS.map(({ modo, titulo, descripcion, tecla, icono }) => {
+    const cuadros = MODOS.map(({ modo, titulo, descripcion, icono }) => {
       const icon = crear('span', 'modos-icono');
       icon.innerHTML = icono;
       const b = crear('button', 'modos-cuadro', [
-        crear('kbd', 'modos-tecla', [tecla]),
         icon,
         crear('strong', 'modos-nombre', [t(titulo)]),
         crear('small', 'modos-desc', [t(descripcion)]),
@@ -105,12 +104,6 @@ export function crearModosUi(): ModosUi {
       fin(modo);
     }, FUNDIDO_SALIDA_MS);
   }
-
-  window.addEventListener('keydown', (ev) => {
-    if (!esVisible || !alElegir || ev.repeat || ev.ctrlKey || ev.metaKey || ev.altKey) return;
-    const m = MODOS.find((x) => `Digit${x.tecla}` === ev.code || `Numpad${x.tecla}` === ev.code);
-    if (m) elegirModo(m.modo);
-  });
 
   alCambiarIdioma(() => {
     if (esVisible) pintar();

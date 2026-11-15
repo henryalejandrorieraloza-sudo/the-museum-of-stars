@@ -31,7 +31,7 @@
     <div id="subtitulos" class="subtitulos" hidden></div>
     <p id="ayuda" class="ayuda"></p>
     <div id="cursor" class="cursor" hidden></div>
-    <!-- Anillo de mantener (E con teclado, puño cerrado con cámara): desplegar el LRV, recoger, volver. Lo dibuja src/ui/anillo.ts. -->
+    <!-- Anillo de mantener (E con teclado, puño cerrado con cámara; ratón al señalar con teclado): desplegar el LRV, recoger, volver, señalar. Lo dibuja src/ui/anillo.ts. -->
     <div id="anillo" class="anillo" hidden>
       <svg viewBox="0 0 48 48" aria-hidden="true">
         <circle class="anillo-fondo" cx="24" cy="24" r="20" />
@@ -42,6 +42,11 @@
         <path d="M5.5 11V9.5a1.5 1.5 0 0 1 3 0a1.5 1.5 0 0 1 3 0a1.5 1.5 0 0 1 3 0a1.5 1.5 0 0 1 3 0V14c0 3.5-2 6-5.5 6h-1.5c-3 0-5.5-2-5.5-5.5z" />
         <path d="M8.5 9.5V12M11.5 9.5V12M14.5 9.5V12" />
         <path d="M5.5 14.5h4.5a1.3 1.3 0 0 1 0 2.6H8.5" />
+      </svg>
+      <svg class="anillo-clic" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="7" y="4" width="10" height="16" rx="5" />
+        <path d="M12 4v6" />
+        <path d="M7 10h5V4.6A5 5 0 0 0 7 9.5z" fill="#fff" stroke="none" />
       </svg>
     </div>
     <button id="opcionesBoton" class="opciones-boton" type="button"></button>

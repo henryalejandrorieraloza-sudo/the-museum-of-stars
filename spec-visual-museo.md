@@ -89,8 +89,10 @@ Fuente: entrevista con Henry (/interview). Alcance: solo la parte visual del mus
 | A / D | Paso lateral en el museo. En el LRV, volante a la izquierda / derecha | Volante gestual (en el LRV) |
 | Ratón | Mirar (pointer lock: clic en la escena para capturarlo) | Inclinar y cabecear la cabeza |
 | Espacio | Aplaudir: entrar a la misión o volver al museo | Aplauso |
-| E o clic izquierdo (mantener) | Señalar la vitrina del centro de la pantalla; 1.5 s la selecciona. En la Luna, golpe | Dedo índice; golpe con la mano |
-| F o clic derecho | Pellizco y agarre | Pellizco |
+| Clic izquierdo (mantener) | Señalar la vitrina del centro de la pantalla; 1.5 s la selecciona. En la Luna, golpe | Dedo índice; golpe con la mano |
+| E | Acciones de carga: mantener para desplegar el LRV, recoger muestras o volver al museo. En la Luna, toque para golpear y, con un segundo toque, agarrar | Puño cerrado 3 s; golpe y agarre con las manos |
+| M | En la presentación, una misión, el taller 3D o la exploración libre: vuelve a la pantalla de modos | — |
+| Clic derecho | Pellizco y agarre | Pellizco |
 | B | Bajarse del LRV (misión lunar) | Pellizco sostenido con las dos manos |
 | Esc | Abrir o cerrar Opciones. Soltar el ratón también abre Opciones | — |
 
