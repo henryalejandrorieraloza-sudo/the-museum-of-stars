@@ -6,9 +6,9 @@ import { crearPiezasLRV, type PiezaLRV } from './lrv';
 
 // Taller 3D del LRV: el vehículo flota sobre un fondo blanco y se desarma pieza por pieza (tecla D o botón). Cada
 // primitiva del modelo es su propia malla (lrv.ts, crearPiezasLRV); la lógica del desarme está en game/desarmeLRV.ts.
-// Aquí viven la escena, la cámara tipo TinkerCAD (OrbitControls de Three.js: arrastrar orbita, rueda acerca, Shift o
-// clic derecho desplaza; sin zoom: la distancia es fija), el teclado de cámara y el clic sobre una pieza. Con el teclado la cámara se mueve por un
-// «carril»: la distancia al vehículo es el radio y las flechas (o W A S, Q y E) la llevan a la derecha, a la izquierda,
+// Aquí viven la escena, la cámara tipo TinkerCAD (OrbitControls de Three.js: arrastrar orbita, Shift o clic derecho
+// desplaza; sin zoom: la rueda no hace nada y la distancia es fija), el teclado de cámara y el clic sobre una pieza.
+// Con el teclado la cámara se mueve por un «carril»: la distancia al vehículo es el radio y las flechas (o W A S) la llevan a la derecha, a la izquierda,
 // arriba o abajo sobre esa esfera, mirando siempre al centro; el radio no cambia nunca. D, F (centra la pieza elegida) y M
 // los atiende la interfaz (ui/tallerUi.ts), porque D ya es "desarmar".
 
@@ -39,7 +39,7 @@ const CLIC_MAX_MS = 450;
 const OPACIDAD_ATENUADA = 0.14;
 
 /** Teclas de la cámara. La D no está: es "desarmar". */
-const TECLAS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+const TECLAS = new Set(['KeyW', 'KeyA', 'KeyS', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
 export interface SeleccionTaller {
   indice: number;
@@ -302,14 +302,14 @@ export function crearTallerVisual(renderer: THREE.WebGLRenderer): TallerVisual {
 
   /**
    * Mueve la cámara por la esfera cuyo radio es su distancia al objetivo: a la derecha con la flecha derecha, a la
-   * izquierda con A o la flecha izquierda, arriba con W, E o la flecha de arriba y abajo con S, Q o la de abajo. La
-   * distancia no cambia (solo la rueda la cambia).
+   * izquierda con A o la flecha izquierda, arriba con W o la flecha de arriba y abajo con S o la de abajo. La
+   * distancia no cambia nunca (no hay zoom).
    */
   function moverConTeclas(dtS: number): void {
     if (!controles || pulsadas.size === 0) return;
     const tecla = (a: string, b: string, c = ''): number => (pulsadas.has(a) || pulsadas.has(b) || (c !== '' && pulsadas.has(c)) ? 1 : 0);
     const lado = (pulsadas.has('ArrowRight') ? 1 : 0) - tecla('KeyA', 'ArrowLeft');
-    const vertical = tecla('KeyW', 'ArrowUp', 'KeyE') - tecla('KeyS', 'ArrowDown', 'KeyQ');
+    const vertical = tecla('KeyW', 'ArrowUp') - tecla('KeyS', 'ArrowDown');
     if (lado === 0 && vertical === 0) return;
     camara.updateMatrixWorld();
     _derecha.setFromMatrixColumn(camara.matrixWorld, 0);

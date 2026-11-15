@@ -4,7 +4,7 @@
 //   W / S           caminar hacia delante / atrás (misma velocidad máxima y aceleración que en Opciones)
 //   A / D           paso lateral en el museo; volante del LRV en la misión lunar
 //   Ratón           mirar (pointer lock); equivale a inclinar y cabecear la cabeza
-//   Espacio         aplaudir: entrar a la vitrina y subir al LRV (ya no vuelve al museo)
+//   Espacio         aplaudir: entrar a la vitrina, subir al LRV y volver al museo (igual que el aplauso)
 //   Clic izq.       mantener para señalar la vitrina del centro de la pantalla; en la Luna, golpe y, con un
 //                   segundo clic, agarre de la muestra
 //   E               en la Luna, golpe y, con un segundo toque, agarre de la muestra
@@ -137,7 +137,8 @@ export class FuenteTeclado implements FuenteEntrada {
     // Mira fija en el centro de la pantalla. Solo señala mientras el botón izquierdo está pulsado.
     lectura.senal = { tipo: 'cursor', x: 0.5, y: 0.5, activo: this.senalarRaton };
     lectura.aplauso = this.espacioPendiente;
-    lectura.aplausoVuelve = false;
+    // Espacio hace lo mismo que el aplauso con cámara, también volver al museo desde una misión.
+    lectura.aplausoVuelve = true;
     lectura.golpeHombrosS = this.golpePendiente ? GOLPE_TECLADO_HOMBROS_S : 0;
     lectura.pellizcoNuevo = this.agarrePendiente;
     lectura.agarreNuevo = this.agarrePendiente;
