@@ -349,6 +349,8 @@
   "taller_error": "The 3D workshop could not be set up in this browser.",
   "instr_senalar": "Point at a showcase with your finger for 1.5 s",
   "instr_senalar_teclado": "Click and hold a showcase for 1.5 s",
+  "instr_modos_senalar": "Point at an option with your finger, then put your thumb and index finger together to enter",
+  "instr_modos_senalar_teclado": "Click and hold an option for 1.5 s, then press space to enter",
   "instr_desplegar": "Hold your fist closed to unfold the moon buggy",
   "instr_desplegar_teclado": "Hold the E key down to unfold the moon buggy",
   "instr_subir": "Get close and put your thumb and index finger together to climb aboard",

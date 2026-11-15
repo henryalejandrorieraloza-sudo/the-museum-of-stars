@@ -349,6 +349,8 @@
   "taller_error": "No se pudo montar el taller 3D en este navegador.",
   "instr_senalar": "Señala una vitrina con el dedo durante 1.5 s",
   "instr_senalar_teclado": "Mantén el clic sobre una vitrina 1.5 s",
+  "instr_modos_senalar": "Señala una opción con el dedo y luego junta el pulgar y el índice para entrar",
+  "instr_modos_senalar_teclado": "Mantén el clic sobre una opción 1.5 s y luego pulsa espacio para entrar",
   "instr_desplegar": "Mantén el puño cerrado para desplegar el moon buggy",
   "instr_desplegar_teclado": "Mantén pulsada la tecla E para desplegar el moon buggy",
   "instr_subir": "Acércate y junta el pulgar y el índice para subirte",

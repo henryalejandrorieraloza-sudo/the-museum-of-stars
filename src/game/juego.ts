@@ -167,6 +167,7 @@ const TEXTO_TECLADO: Partial<Record<ClaveTexto, ClaveTexto>> = {
   modos_robi_libre: 'modos_robi_libre_teclado',
   libre_bienvenida: 'libre_bienvenida_teclado',
   instr_senalar: 'instr_senalar_teclado',
+  instr_modos_senalar: 'instr_modos_senalar_teclado',
   instr_desplegar: 'instr_desplegar_teclado',
   instr_subir: 'instr_subir_teclado',
   instr_bajar: 'instr_bajar_teclado',
@@ -772,7 +773,9 @@ function pasoPendiente(sesion: Sesion): ClaveTexto | null {
   if (mentorHablando || colaFrases.length > 0) return null;
   // Y el subtítulo de Robi sigue en pantalla (se quita unos instantes después de la voz): la caja espera a que desaparezca.
   if (sesion.ui.subtitulosVisibles()) return null;
-  if (soloModos) return modoExplicado !== null ? 'entrar_aplauso' : null;
+  // En la pantalla de modos (el inicio del museo) la caja dice qué hacer desde el principio: señalar una opción y, ya
+  // descrita, juntar el pulgar y el índice para entrar.
+  if (soloModos) return modoExplicado !== null ? 'entrar_aplauso' : 'instr_modos_senalar';
   const { museo } = sesion;
   if (mision === null) {
     if (museo.pantalla.tipo !== 'museo') return null;
