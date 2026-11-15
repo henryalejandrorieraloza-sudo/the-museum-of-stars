@@ -5,6 +5,8 @@
   "regreso_museo": "Great tour {cercano}! When the mission is ready, you'll be able to live it in full!",
   "volver_museo": "Back to the museum",
   "entrar_aplauso": "Put your thumb and index finger together to enter",
+  "interactuar": "Put your thumb and index finger together to interact",
+  "interactuar_teclado": "Press space to interact",
   "ayuda": "Raise your knees: walk · tilt your head: turn · point at a showcase for 1.5 s · thumb and index finger together: enter, board or get off the moon buggy · in the moon buggy, right hand forward, backward and to the sides: drive · hold a closed fist in the mission: back to the museum",
   "arranque": "Loading tracking…",
   "camara_error": "Couldn't use the webcam: {error}",

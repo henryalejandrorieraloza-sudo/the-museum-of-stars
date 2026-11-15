@@ -75,7 +75,7 @@ let pasoActual: ClaveTexto | null = null;
 /** Pantalla de modos: opción elegida que Robi ya describió (null si ninguna). Con ella, la caja pide confirmar. */
 let modoExplicado: ModoApp | null = null;
 /** Pasos que se hacen juntando el pulgar y el índice: con cámara, la caja muestra el símbolo 👌. */
-const PASOS_PELLIZCO: readonly ClaveTexto[] = ['entrar_aplauso', 'instr_subir', 'instr_bajar'];
+const PASOS_PELLIZCO: readonly ClaveTexto[] = ['entrar_aplauso', 'interactuar', 'instr_subir', 'instr_bajar'];
 /** La voz ya dijo "Aprieta espacio para subirte" en esta visita: hasta entonces, el aplauso no sube al LRV. */
 let subidaLista = false;
 /** La voz ya explicó cómo conducir en esta visita: hasta entonces, caminar no mueve el LRV. */
@@ -152,6 +152,7 @@ let listoPendiente = false;
 const TEXTO_TECLADO: Partial<Record<ClaveTexto, ClaveTexto>> = {
   ayuda: 'ayuda_teclado',
   entrar_aplauso: 'entrar_teclado',
+  interactuar: 'interactuar_teclado',
   vitrina_lrv: 'vitrina_lrv_teclado',
   saludo_vitrinas: 'saludo_vitrinas_teclado',
   luna_entrando_museo: 'luna_entrando_museo_teclado',
@@ -769,6 +770,10 @@ function pasoPendiente(sesion: Sesion): ClaveTexto | null {
   const soloModos = motivosPausaEntrada.size === 1 && motivosPausaEntrada.has('menu');
   // Con otra pausa, una pantalla o una cinemática encima, no se pide nada.
   if ((motivosPausaEntrada.size > 0 && !soloModos) || cinematicaActiva() || presentacion !== null) return null;
+  // Vitrina ya explicada: la invitación a interactuar se queda en pantalla hasta juntar el pulgar y el índice (o pulsar
+  // espacio), aunque los subtítulos sigan. Con Robi hablando no se pide nada (SPEC 7.2).
+  const { museo } = sesion;
+  if (mision === null && museo.pantalla.tipo === 'museo' && museo.esperaEntrada) return 'interactuar';
   // Robi todavía habla (o le queda una frase en cola): primero termina, y solo después se pide la acción.
   if (mentorHablando || colaFrases.length > 0) return null;
   // Y el subtítulo de Robi sigue en pantalla (se quita unos instantes después de la voz): la caja espera a que desaparezca.
@@ -776,10 +781,8 @@ function pasoPendiente(sesion: Sesion): ClaveTexto | null {
   // En la pantalla de modos (el inicio del museo) la caja dice qué hacer desde el principio: señalar una opción y, ya
   // descrita, juntar el pulgar y el índice para entrar.
   if (soloModos) return modoExplicado !== null ? 'entrar_aplauso' : 'instr_modos_senalar';
-  const { museo } = sesion;
   if (mision === null) {
     if (museo.pantalla.tipo !== 'museo') return null;
-    if (museo.esperaEntrada) return 'entrar_aplauso';
     // Robi ya saludó y el visitante todavía no ha elegido ninguna vitrina: se le pide que señale una.
     if (saludoDado && !vitrinaElegida && museo.vitrinaSeleccionada === null) return 'instr_senalar';
     return null;

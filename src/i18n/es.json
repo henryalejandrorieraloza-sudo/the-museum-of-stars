@@ -6,6 +6,8 @@
   "regreso_museo": "¡Buen recorrido {cercano}! Cuando la misión esté lista, ¡podrás vivirla completa!",
   "volver_museo": "Volver al museo",
   "entrar_aplauso": "Junta el pulgar y el índice para entrar",
+  "interactuar": "Junta el pulgar y el índice para interactuar",
+  "interactuar_teclado": "Pulsa espacio para interactuar",
   "ayuda": "Subir las rodillas: caminar · inclinar la cabeza: girar · señalar una vitrina 1.5 s · pulgar e índice juntos: entrar, subir al carro o bajarse · en el carro, mano derecha adelante, atrás y a los lados: conducir · mantener el puño cerrado en la misión: volver al museo",
   "arranque": "Cargando seguimiento…",
   "camara_error": "No se pudo usar la webcam: {error}",

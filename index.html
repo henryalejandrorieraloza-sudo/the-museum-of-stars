@@ -28,7 +28,16 @@
       <p id="cinematicaTexto" class="cinematica-texto"></p>
       <button id="cinematicaOmitir" class="cinematica-omitir" type="button"></button>
     </section>
-    <div id="subtitulos" class="subtitulos" hidden></div>
+    <!-- Franja inferior (src/juego.css, .franja-inferior): subtítulos y caja de instrucción apilados, para que no se pisen. -->
+    <div class="franja-inferior">
+      <div id="subtitulos" class="subtitulos" hidden></div>
+      <!-- Caja de instrucción (src/ui/instruccion.ts): el paso que el juego espera del jugador. La de interactuar se queda hasta hacerlo. -->
+      <section id="instruccion" class="instruccion" role="status" hidden>
+        <span class="instruccion-marca" aria-hidden="true"></span>
+        <p id="instruccionTexto" class="instruccion-texto"></p>
+        <span id="instruccionSimbolo" class="instruccion-simbolo" aria-hidden="true" hidden>👌</span>
+      </section>
+    </div>
     <p id="ayuda" class="ayuda"></p>
     <div id="cursor" class="cursor" hidden></div>
     <!-- Anillo de mantener (E con teclado, puño cerrado con cámara; ratón al señalar con teclado): desplegar el LRV, recoger, volver, señalar. Lo dibuja src/ui/anillo.ts. -->
@@ -49,12 +58,6 @@
         <path d="M7 10h5V4.6A5 5 0 0 0 7 9.5z" fill="#fff" stroke="none" />
       </svg>
     </div>
-    <!-- Caja de instrucción (src/ui/instruccion.ts): el paso que el juego espera del jugador, en la franja de los subtítulos. -->
-    <section id="instruccion" class="instruccion" role="status" hidden>
-      <span class="instruccion-marca" aria-hidden="true"></span>
-      <p id="instruccionTexto" class="instruccion-texto"></p>
-      <span id="instruccionSimbolo" class="instruccion-simbolo" aria-hidden="true" hidden>👌</span>
-    </section>
     <button id="opcionesBoton" class="opciones-boton" type="button"></button>
     <section id="opciones" class="opciones" hidden></section>
 

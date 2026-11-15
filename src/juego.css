@@ -33,11 +33,21 @@
   z-index: 3;
 }
 
-.subtitulos {
+/* Franja inferior: subtítulos y caja de instrucción apilados, abajo y centrados. Así la caja no tiene que esperar a Robi. */
+.franja-inferior {
   position: fixed;
   left: 16px;
   right: 16px;
   bottom: 6vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.subtitulos {
   max-width: 58ch;
   margin: 0 auto;
   padding: 0;
@@ -213,10 +223,6 @@
    subtítulos (abajo, centrada) y sigue su lenguaje: texto blanco grande con sombra suave, sobre un velo oscuro
    translúcido, con el acento amarillo del anillo. No captura clics. */
 .instruccion {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 6vh;
   width: max-content;
   max-width: min(78ch, calc(100% - 32px));
   margin: 0 auto;

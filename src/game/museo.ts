@@ -120,9 +120,12 @@ export class Museo {
     this.oyentes.push(oyente);
   }
 
-  /** Robi ya explicó la vitrina con misión: aplaudir o pulsar espacio entra (la caja de instrucción lo pide). */
+  /**
+   * Robi ya explicó la vitrina con misión: juntar el pulgar y el índice o pulsar espacio entra (la caja de instrucción
+   * lo pide hasta que se hace). Durante el fundido de entrada ya no se pide.
+   */
   get esperaEntrada(): boolean {
-    return this.seleccionada !== null && this.fase === 'listo' && MISION_DE[this.seleccionada] !== null;
+    return this.seleccionada !== null && this.fase === 'listo' && MISION_DE[this.seleccionada] !== null && !this.enTransicion;
   }
 
   /**
