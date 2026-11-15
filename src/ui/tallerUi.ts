@@ -1,17 +1,30 @@
 // Interfaz del taller 3D del LRV (visual/tallerLRV.ts): paneles claros alrededor del modelo sobre el fondo blanco, como en
-// las referencias. Cabecera, estado, datos de la NSSDC, subsistemas (clic para aislar uno), visualización, el registro con el
-// botón "Desarmar / Armar" y, al elegir una pieza, su tarjeta con nombre y función unida a la pieza por una línea guía.
-// Teclas: D desarma o arma, F enfoca y M vuelve al menú (la cámara la lleva tallerLRV.ts).
+// las referencias. Cabecera, estado, datos de la NSSDC, subsistemas (clic o dedo para aislar uno), visualización y, al elegir
+// una pieza, su tarjeta con nombre y función unida a la pieza por una línea guía.
+// Teclas: D desarma o arma (con cámara lo hacen los gestos de separar y juntar las manos, ver fijarDesarme), F enfoca y M vuelve al menú
+// (la cámara la lleva tallerLRV.ts).
 
 import { alCambiarIdioma, t, type ClaveTexto } from '../i18n';
+import type { ModoControl } from '../game/opciones';
 import { GRUPOS_LRV, claveFuncionPieza, claveGrupo, claveNombrePieza, infoPieza, type GrupoLRV } from '../game/piezasLRV';
 import type { EstadoDesarme } from '../game/desarmeLRV';
 import type { EstadoTaller, TallerVisual } from '../visual/tallerLRV';
 import { requireEl } from './dom';
 
 export interface TallerUi {
-  /** Muestra el taller y enlaza la interfaz con su escena. */
-  abrir(taller: TallerVisual): void;
+  /** Muestra el taller y enlaza la interfaz con su escena. Con cámara, desarmar es un gesto y la tecla D no actúa. */
+  abrir(taller: TallerVisual, control: ModoControl): void;
+  /**
+   * Elemento de la interfaz que se puede elegir con el dedo bajo un punto de la pantalla (px de ventana): su clave, o null.
+   * Hoy son los subsistemas ("grupo:todos", "grupo:<grupo>").
+   */
+  senalableEn(x: number, y: number): string | null;
+  /** Clave del elemento señalable que ya está elegido ahora (el subsistema activo), para no volver a elegirlo. */
+  readonly senalableElegido: string;
+  /** Elige un elemento señalable, como el clic. No hace nada si la clave no existe o el taller está cerrado. */
+  activarSenalable(clave: string): void;
+  /** Desarma (true) o arma (false): lo piden los gestos de separar y juntar las manos. No hace nada con el taller cerrado. */
+  fijarDesarme(desarmado: boolean): void;
   /** Lo oculta (la escena la suelta quien llama). */
   cerrar(): void;
   /** El jugador pide volver al menú (botón o tecla M). */
@@ -58,23 +71,19 @@ export function crearTallerUi(): TallerUi {
   let elegida: number | null = null;
   let grupoActivo: GrupoLRV | null = null;
   let giro = false;
-  let arrastrando = false;
+  let control: ModoControl = 'teclado';
   let ultimo: EstadoTaller | null = null;
 
   // Referencias que se actualizan en cada fotograma.
   let valorEstado: HTMLElement;
-  let boton: HTMLButtonElement;
-  let barra: HTMLInputElement;
-  let relleno: HTMLElement;
   let tarjeta: HTMLElement;
   let linea: SVGLineElement;
   let punto: SVGCircleElement;
   let svg: SVGSVGElement;
   let ultimaEtiqueta = '';
 
-  function etiquetaBoton(estado: EstadoDesarme): string {
-    const desarmar = estado === 'armado' || estado === 'armando';
-    return `${t(desarmar ? 'taller_desarmar' : 'taller_armar')} · D`;
+  function claveGrupoSenalable(g: GrupoLRV | null): string {
+    return g === null ? 'grupo:todos' : `grupo:${g}`;
   }
 
   function panel(titulo: ClaveTexto, cuerpo: HTMLElement, num: string): HTMLElement {
@@ -107,10 +116,9 @@ export function crearTallerUi(): TallerUi {
 
     // --- Columna izquierda: datos de la NASA
     const fuente = crear('p', 'taller-fuente', [t('taller_fuente_nssdc')]);
-    const izquierda = crear('aside', 'taller-columna taller-columna--izq', [
-      panel('taller_datos', crear('div', '', [filas(DATOS), fuente]), '01'),
-      panel('taller_energia', filas(ENERGIA), '02'),
-    ]);
+    // (La visualización va aquí abajo y no con los subsistemas: con una tarjeta abierta, la columna derecha ya no cabe, y con
+    // el dedo no se puede desplazar.)
+    const columnaIzq = crear('aside', 'taller-columna taller-columna--izq');
 
     // --- Columna derecha: tarjeta de pieza, subsistemas y visualización
     tarjeta = crear('section', 'taller-pieza');
@@ -119,10 +127,12 @@ export function crearTallerUi(): TallerUi {
     for (const c of tv.claves) conteo.set(infoPieza(c).grupo, (conteo.get(infoPieza(c).grupo) ?? 0) + 1);
     const lista = crear('ul', 'taller-lista');
     const todos = crear('li', grupoActivo === null ? 'activa' : '', [crear('span', '', [t('taller_todos')]), crear('b', '', [String(tv.cantidad)])]);
+    todos.dataset.senalable = claveGrupoSenalable(null);
     todos.addEventListener('click', () => elegirGrupo(null));
     lista.append(todos);
     GRUPOS_LRV.forEach((g, i) => {
       const li = crear('li', grupoActivo === g ? 'activa' : '', [crear('i', '', [String(i + 1).padStart(2, '0')]), crear('span', '', [t(claveGrupo(g))]), crear('b', '', [String(conteo.get(g) ?? 0)])]);
+      li.dataset.senalable = claveGrupoSenalable(g);
       li.addEventListener('click', () => elegirGrupo(grupoActivo === g ? null : g));
       lista.append(li);
     });
@@ -136,32 +146,15 @@ export function crearTallerUi(): TallerUi {
       tv.girar(giro);
       chipGiro.classList.toggle('activo', giro);
     });
-    const derecha = crear('aside', 'taller-columna taller-columna--der', [
-      tarjeta,
-      panel('taller_subsistemas', lista, '03'),
-      panel('taller_visualizacion', crear('div', 'taller-chips', [chipDesarmar, chipGiro]), '04'),
-    ]);
+    columnaIzq.append(
+      panel('taller_datos', crear('div', '', [filas(DATOS), fuente]), '01'),
+      panel('taller_energia', filas(ENERGIA), '02'),
+      panel('taller_visualizacion', crear('div', 'taller-chips', [chipDesarmar, chipGiro]), '03'),
+    );
+    const izquierda = columnaIzq;
+    const derecha = crear('aside', 'taller-columna taller-columna--der', [tarjeta, panel('taller_subsistemas', lista, '04')]);
 
-    // --- Registro: botón y barra de avance del desarme
-    boton = crear('button', 'taller-boton', [etiquetaBoton(ultimo?.estado ?? 'armado')]);
-    boton.type = 'button';
-    boton.addEventListener('click', () => tv.alternar());
-    barra = crear('input', 'taller-barra');
-    barra.type = 'range';
-    barra.min = '0';
-    barra.max = '1000';
-    barra.value = String(Math.round((ultimo?.progreso ?? 0) * 1000));
-    barra.setAttribute('aria-label', t('taller_registro'));
-    barra.addEventListener('input', () => tv.fijarProgreso(Number(barra.value) / 1000));
-    barra.addEventListener('pointerdown', () => (arrastrando = true));
-    window.addEventListener('pointerup', () => (arrastrando = false));
-    relleno = crear('span', 'taller-barra-relleno');
-    const registro = crear('section', 'taller-registro', [
-      crear('header', '', [crear('span', '', [t('taller_registro')]), crear('i', '', ['05'])]),
-      crear('div', 'taller-registro-fila', [boton, crear('div', 'taller-barra-caja', [relleno, barra])]),
-    ]);
-
-    const ayuda = crear('p', 'taller-ayuda', [t('taller_ayuda')]);
+    const ayuda = crear('p', 'taller-ayuda', [t(control === 'camara' ? 'taller_ayuda_camara' : 'taller_ayuda')]);
 
     // --- Línea guía de la pieza a su tarjeta
     svg = document.createElementNS(NS, 'svg');
@@ -172,7 +165,7 @@ export function crearTallerUi(): TallerUi {
     svg.append(linea, punto);
     svg.style.display = 'none';
 
-    raiz.replaceChildren(svg, cabecera, izquierda, derecha, registro, ayuda);
+    raiz.replaceChildren(svg, cabecera, izquierda, derecha, ayuda);
     if (elegida !== null) mostrarTarjeta(elegida);
   }
 
@@ -218,11 +211,8 @@ export function crearTallerUi(): TallerUi {
     if (etiqueta !== ultimaEtiqueta) {
       ultimaEtiqueta = etiqueta;
       valorEstado.textContent = t(ESTADOS[e.estado]);
-      boton.textContent = etiquetaBoton(e.estado);
       raiz.dataset.estado = e.estado;
     }
-    if (!arrastrando) barra.value = String(Math.round(e.progreso * 1000));
-    relleno.style.width = `${e.progreso * 100}%`;
     // Línea guía: del centro de la pieza al borde izquierdo de la tarjeta.
     const s = e.seleccion;
     if (!s || !s.visible || tarjeta.hidden) {
@@ -242,7 +232,7 @@ export function crearTallerUi(): TallerUi {
   const alTecla = (ev: KeyboardEvent): void => {
     if (!abierto || !taller || ev.repeat || ev.ctrlKey || ev.metaKey || ev.altKey) return;
     if (ev.target instanceof HTMLElement && ev.target.closest('input[type="text"], select, textarea')) return;
-    if (ev.code === 'KeyD') taller.alternar();
+    if (ev.code === 'KeyD' && control === 'teclado') taller.alternar();
   };
   window.addEventListener('keydown', alTecla);
   alCambiarIdioma(() => {
@@ -252,8 +242,9 @@ export function crearTallerUi(): TallerUi {
   });
 
   return {
-    abrir(tv) {
+    abrir(tv, modo) {
       taller = tv;
+      control = modo;
       abierto = true;
       elegida = null;
       grupoActivo = null;
@@ -273,6 +264,21 @@ export function crearTallerUi(): TallerUi {
         taller.alSeleccionar = () => {};
       }
       taller = null;
+    },
+    senalableEn(x, y) {
+      if (!abierto) return null;
+      return document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-senalable]')?.dataset.senalable ?? null;
+    },
+    get senalableElegido() {
+      return claveGrupoSenalable(grupoActivo);
+    },
+    activarSenalable(clave) {
+      if (!abierto) return;
+      const el = Array.from(raiz.querySelectorAll<HTMLElement>('[data-senalable]')).find((e) => e.dataset.senalable === clave);
+      el?.click();
+    },
+    fijarDesarme(desarmado) {
+      if (abierto) taller?.fijarDesarme(desarmado);
     },
     alSalir(oyente) {
       salir = oyente;

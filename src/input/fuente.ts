@@ -4,6 +4,7 @@
 
 import type { EntradaBalanceo } from '../game/balanceo';
 import type { ModoControl } from '../game/opciones';
+import type { GestoManos } from '../tracking/gestures';
 import type { TrackedHand } from '../tracking/tracker';
 
 export type { ModoControl };
@@ -64,6 +65,8 @@ export interface LecturaEntrada {
   volanteGrados: number | null;
   /** Bajarse del LRV en este fotograma: tecla B, o pellizco sostenido con las dos manos (misión lunar). */
   bajarse: boolean;
+  /** Gesto de manos del taller 3D (cámara): separarlas desarma el LRV y juntarlas de nuevo lo arma. */
+  gestoManos: GestoManos | null;
   /** Tecla E mantenida: con el LRV plegado, llena el anillo de desplegarlo (misión lunar). */
   desplegarMantenido: boolean;
   /**
@@ -106,6 +109,7 @@ export function lecturaVacia(ahoraS: number): LecturaEntrada {
     golpeHombrosS: 0,
     volanteGrados: null,
     bajarse: false,
+    gestoManos: null,
     desplegarMantenido: false,
     punoMantenido: false,
     manos: null,

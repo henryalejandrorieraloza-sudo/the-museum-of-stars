@@ -10,9 +10,12 @@ import {
   PUNO_GRACIA_S,
   pellizcoDoble,
   pellizcoDobleEstadoInicial,
+  separarManos,
+  separarManosEstadoInicial,
   volante,
   type AplausoEstado,
   type PellizcoDobleEstado,
+  type SepararManosEstado,
 } from '../tracking/gestures';
 import {
   HAND_IDX,
@@ -54,6 +57,8 @@ export class FuenteCamara implements FuenteEntrada {
   private aplausoEstado: AplausoEstado = aplausoEstadoInicial;
   /** Pellizco sostenido con las dos manos: bajarse del LRV. */
   private pellizcoDobleEstado: PellizcoDobleEstado = pellizcoDobleEstadoInicial;
+  /** Manos que se separan o se juntan: desarmar o armar el LRV en el taller. */
+  private separarEstado: SepararManosEstado = separarManosEstadoInicial;
   private ultimoFrescoS: number | null = null;
   private ultimoDatoS = Number.NEGATIVE_INFINITY;
   /** Última posición (px) y tiempo de cada muñeca, para medir la velocidad de golpe (SPEC 8.3). */
@@ -188,6 +193,8 @@ export class FuenteCamara implements FuenteEntrada {
     lectura.volanteGrados = volante(frame.hands, frame.width, frame.height)?.grados ?? null;
     const doble = pellizcoDoble(frame.hands, frame.width, frame.height, this.pellizcoDobleEstado, ahoraS);
     this.pellizcoDobleEstado = doble.estado;
+    const separar = separarManos(frame.hands, shoulderPx, frame.width, frame.height, this.separarEstado, ahoraS);
+    this.separarEstado = separar.estado;
 
     if (this.calibracion === null) {
       const nueva = this.calibrador.alimentar(ahoraS, roll, pitch, framing === 'ok');
@@ -210,6 +217,8 @@ export class FuenteCamara implements FuenteEntrada {
     lectura.aplauso = ap.detectado || (espacio && !this.pausada);
     // Bajarse del LRV: solo la misión lunar lo usa, y solo con el jugador sentado.
     lectura.bajarse = doble.detectado && !this.pausada;
+    // Separar y juntar las manos solo lo usa el taller 3D, que pausa la entrada; juego.ts decide si cuenta.
+    lectura.gestoManos = separar.gesto;
     // Señalar y pellizco dependen solo de la mano que señala.
     this.senalar(frame, lectura);
 

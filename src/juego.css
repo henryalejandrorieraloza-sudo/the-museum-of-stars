@@ -1314,7 +1314,7 @@
   display: flex;
   align-items: center;
   gap: 18px;
-  padding-right: 250px;
+  padding-right: 320px;
   pointer-events: none;
 }
 
@@ -1331,7 +1331,7 @@
   background: var(--t-naranja);
   color: #fff;
   border-radius: 0 0 14px 0;
-  font: 700 14px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 700 18px ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.08em;
 }
 
@@ -1347,7 +1347,7 @@
 
 .taller-titulo h1 {
   margin: 0;
-  font-size: 26px;
+  font-size: 34px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -1360,7 +1360,7 @@
 .taller-titulo p {
   margin: 2px 0 0;
   color: var(--t-tenue);
-  font: 500 10.5px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 500 13.5px ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -1369,7 +1369,7 @@
   display: flex;
   gap: 22px;
   margin-left: auto;
-  font: 500 10.5px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 500 13.5px ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--t-tenue);
@@ -1382,7 +1382,7 @@
 
 .taller-estado b {
   color: var(--t-texto);
-  font-size: 13px;
+  font-size: 17px;
   letter-spacing: 0.06em;
 }
 
@@ -1397,7 +1397,7 @@
   border-radius: 10px;
   background: var(--t-papel);
   color: var(--t-texto);
-  font: 600 11px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 600 14.5px ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
@@ -1411,11 +1411,11 @@
 .taller-columna {
   position: absolute;
   top: 84px;
-  bottom: 118px;
+  bottom: 56px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: 248px;
+  width: 310px;
   overflow-y: auto;
   scrollbar-width: none;
   pointer-events: none;
@@ -1431,12 +1431,11 @@
 
 .taller-columna--der {
   right: 16px;
-  width: 290px;
+  width: 360px;
 }
 
 .taller-panel,
-.taller-pieza,
-.taller-registro {
+.taller-pieza {
   padding: 12px 14px 14px;
   border: 1px solid var(--t-borde);
   border-radius: 14px;
@@ -1445,19 +1444,17 @@
   box-shadow: 0 6px 24px rgba(60, 50, 30, 0.06);
 }
 
-.taller-panel > header,
-.taller-registro > header {
+.taller-panel > header {
   display: flex;
   justify-content: space-between;
   margin-bottom: 10px;
   color: var(--t-tenue);
-  font: 600 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 600 13px ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
-.taller-panel > header span::before,
-.taller-registro > header span::before {
+.taller-panel > header span::before {
   content: '';
   display: inline-block;
   width: 3px;
@@ -1467,8 +1464,7 @@
   background: var(--t-naranja);
 }
 
-.taller-panel > header i,
-.taller-registro > header i {
+.taller-panel > header i {
   font-style: normal;
   opacity: 0.6;
 }
@@ -1478,7 +1474,7 @@
   grid-template-columns: 1fr auto;
   gap: 7px 10px;
   margin: 0;
-  font-size: 13px;
+  font-size: 17px;
 }
 
 .taller-datos dt {
@@ -1487,13 +1483,13 @@
 
 .taller-datos dd {
   margin: 0;
-  font: 600 13px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 600 17px ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
 .taller-fuente {
   margin: 10px 0 0;
   color: var(--t-tenue);
-  font: 500 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 500 13px ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.06em;
 }
 
@@ -1510,9 +1506,9 @@
   grid-template-columns: auto 1fr auto;
   gap: 8px;
   align-items: center;
-  padding: 5px 8px;
+  padding: 4px 10px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 17px;
   cursor: pointer;
 }
 
@@ -1522,13 +1518,13 @@
 
 .taller-lista li i {
   color: var(--t-tenue);
-  font: 500 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 500 13px ui-monospace, 'SF Mono', Menlo, monospace;
   font-style: normal;
 }
 
 .taller-lista li b {
   color: var(--t-tenue);
-  font: 600 11px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 600 14.5px ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
 .taller-lista li:hover {
@@ -1552,12 +1548,12 @@
 }
 
 .taller-chip {
-  padding: 6px 12px;
+  padding: 8px 14px;
   border: 1px solid var(--t-borde);
   border-radius: 8px;
   background: #fff;
   color: var(--t-texto);
-  font: 600 10.5px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 600 13.5px ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
@@ -1584,19 +1580,19 @@
   justify-content: space-between;
   align-items: center;
   color: var(--t-tenue);
-  font: 600 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 600 13px ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .taller-pieza-cerrar {
-  width: 24px;
-  height: 24px;
+  width: 30px;
+  height: 30px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--t-tenue);
-  font-size: 18px;
+  font-size: 23.5px;
   line-height: 1;
   cursor: pointer;
 }
@@ -1609,7 +1605,7 @@
 .taller-pieza h2 {
   margin: 6px 0 10px;
   color: var(--t-naranja);
-  font-size: 21px;
+  font-size: 27.5px;
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.15;
@@ -1618,14 +1614,14 @@
 .taller-pieza h3 {
   margin: 0 0 3px;
   color: var(--t-tenue);
-  font: 600 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 600 13px ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .taller-pieza p {
   margin: 0 0 12px;
-  font-size: 13.5px;
+  font-size: 17.5px;
   line-height: 1.45;
 }
 
@@ -1636,7 +1632,7 @@
 
 .taller-pieza footer small {
   color: var(--t-tenue);
-  font: 500 10.5px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 500 13.5px ui-monospace, 'SF Mono', Menlo, monospace;
 }
 
 .taller-sello {
@@ -1646,7 +1642,7 @@
   border-radius: 6px;
   background: #fff6df;
   color: #8a5a00;
-  font: 600 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 600 13px ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.06em;
 }
 
@@ -1656,96 +1652,6 @@
   color: #1c7a4c;
 }
 
-.taller-registro {
-  position: absolute;
-  left: 280px;
-  right: 322px;
-  bottom: 34px;
-  padding-bottom: 12px;
-}
-
-.taller-registro-fila {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.taller-boton {
-  flex: none;
-  padding: 11px 18px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--t-naranja);
-  color: #fff;
-  font: 700 12px ui-monospace, 'SF Mono', Menlo, monospace;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  cursor: pointer;
-  box-shadow: 0 6px 18px rgba(242, 106, 33, 0.3);
-}
-
-.taller-boton:hover {
-  filter: brightness(1.06);
-}
-
-.taller-barra-caja {
-  position: relative;
-  flex: 1;
-  height: 22px;
-}
-
-.taller-barra-caja::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 10px;
-  height: 2px;
-  background: var(--t-borde);
-}
-
-.taller-barra-relleno {
-  position: absolute;
-  left: 0;
-  top: 10px;
-  height: 2px;
-  background: var(--t-naranja);
-}
-
-.taller-barra {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  margin: 0;
-  background: transparent;
-  appearance: none;
-  -webkit-appearance: none;
-  cursor: pointer;
-}
-
-.taller-barra::-webkit-slider-runnable-track {
-  background: transparent;
-  height: 22px;
-}
-
-.taller-barra::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: 4px;
-  border: 2px solid var(--t-naranja);
-  border-radius: 50%;
-  background: #fff;
-}
-
-.taller-barra::-moz-range-thumb {
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--t-naranja);
-  border-radius: 50%;
-  background: #fff;
-}
-
 .taller-ayuda {
   position: absolute;
   left: 16px;
@@ -1753,7 +1659,7 @@
   bottom: 10px;
   margin: 0;
   color: var(--t-tenue);
-  font: 500 10px ui-monospace, 'SF Mono', Menlo, monospace;
+  font: 500 13px ui-monospace, 'SF Mono', Menlo, monospace;
   letter-spacing: 0.08em;
   text-align: center;
   pointer-events: none;
@@ -1779,11 +1685,17 @@
   stroke-width: 2;
 }
 
-@media (max-width: 1080px) {
-  .taller-registro {
-    left: 16px;
-    right: 16px;
+/* Pantallas bajas: la lista de subsistemas debe seguir entera con la tarjeta abierta (con el dedo no se puede desplazar). */
+@media (max-height: 800px) {
+  .taller-lista li {
+    padding: 1px 10px;
   }
+  .taller-pieza p {
+    margin-bottom: 6px;
+  }
+}
+
+@media (max-width: 1080px) {
   .taller-columna--izq {
     display: none;
   }

@@ -4,6 +4,8 @@
 // en cada vuelta lee una LecturaEntrada y la reparte.
 
 import { visual } from '../visual/museo';
+import type { TallerVisual } from '../visual/tallerLRV';
+import { senalarTaller, senalarTallerEstadoInicial } from './senalarTaller';
 import { crearVoz, dividirFrases, type Voz } from '../audio/voz';
 import { alinearTiempos, cargarCatalogoVoz, claveTexto, type CatalogoVoz } from '../audio/lineaGrabada';
 import { parsearGuion } from '../audio/guion';
@@ -584,6 +586,60 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
     }
   };
 
+  // Taller 3D con cámara: la cabeza lleva la cámara por el carril (como las flechas) y el dedo índice elige piezas y
+  // subsistemas (como el clic). El taller en sí no sabe de gestos: solo recibe `orbitar` y `elegirPieza` (visual/tallerLRV.ts).
+  let tallerVisual: TallerVisual | null = null;
+  let senalarTallerEstado = senalarTallerEstadoInicial;
+  function apagarPunteroTaller(): void {
+    cursorUi.mostrar(false);
+    anillo.situar(null);
+    anillo.mostrar(null);
+    senalarTallerEstado = senalarTallerEstadoInicial;
+  }
+  function actualizarTaller(lectura: LecturaEntrada): void {
+    const tv = tallerVisual;
+    // Con teclado, la cámara, el ratón y la D los atiende el propio taller.
+    if (!tv || modoControl !== 'camara') return;
+    if (motivosPausaEntrada.has('opciones') || !lectura.listo) {
+      apagarPunteroTaller();
+      return;
+    }
+    // Manos: separarlas desarma el LRV y juntarlas lo arma (con teclado es la D).
+    if (lectura.gestoManos) tallerUi.fijarDesarme(lectura.gestoManos === 'separar');
+    if (!lectura.hayDatos) return;
+    // Cabeza: inclinarla a un lado o subirla y bajarla lleva la cámara por el carril, igual que las flechas.
+    if (lectura.conMovimiento) tv.orbitar(lectura.giroGrados, lectura.cabeceoGrados);
+    // Dedo índice: señalar una pieza el tiempo necesario la elige, como el clic con el ratón.
+    const senal = lectura.senal;
+    if (senal?.tipo !== 'cursor') {
+      apagarPunteroTaller();
+      return;
+    }
+    cursorUi.mostrar(true);
+    cursorUi.mover(senal.x, senal.y, !senal.activo);
+    // Elegible: un subsistema de la lista (si el dedo está sobre ella) o una pieza visible del lienzo (un panel encima no
+    // es pieza). Lo elegido se queda elegido hasta que se elige otra cosa: el fondo y la mano abajo no lo sueltan.
+    let objetivo: string | null = null;
+    let elegido: string | null = null;
+    if (senal.activo) {
+      const px = senal.x * window.innerWidth;
+      const py = senal.y * window.innerHeight;
+      objetivo = tallerUi.senalableEn(px, py);
+      if (objetivo !== null) {
+        elegido = tallerUi.senalableElegido;
+      } else {
+        const pieza = tv.bajoPunto(px, py).pieza;
+        objetivo = pieza === null ? null : `pieza:${pieza}`;
+        elegido = tv.elegida === null ? null : `pieza:${tv.elegida}`;
+      }
+    }
+    const r = senalarTaller(senalarTallerEstado, objetivo, elegido, lectura.ahoraS);
+    senalarTallerEstado = r.estado;
+    if (r.elegir?.startsWith('pieza:')) tv.elegirPieza(Number(r.elegir.slice('pieza:'.length)));
+    else if (r.elegir !== null) tallerUi.activarSenalable(r.elegir);
+    // Sin anillo: en el taller se elige solo con esperar sobre el objetivo; el cursor es la única marca.
+  }
+
   function abrirTaller(): void {
     const tv = visual.museo.entrarTaller();
     if (!tv) {
@@ -597,12 +653,16 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
     requireEl('ayuda').hidden = true;
     cursorUi.mostrar(false);
     anillo.mostrar(null);
-    tallerUi.abrir(tv);
+    tallerVisual = tv;
+    senalarTallerEstado = senalarTallerEstadoInicial;
+    tallerUi.abrir(tv, modoControl);
   }
 
   /** Sale del taller 3D y vuelve a la pantalla de modos. */
   function salirDelTaller(): void {
     tallerUi.cerrar();
+    tallerVisual = null;
+    apagarPunteroTaller();
     visual.museo.salirTaller();
     pausarEntrada('taller', false);
     modoApp = null;
@@ -661,7 +721,9 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
       decirFrase(voz, ui, 'saludo_bienvenida', undefined, true);
       decirFrase(voz, ui, 'saludo_vitrinas', undefined, true);
     }
-    if (lectura.listo && lectura.hayDatos && !enCinematica) aplicarLectura(sesion, lectura);
+    // El taller 3D tiene su propia escena y no usa el museo: sus gestos van aparte (actualizarTaller).
+    if (modoApp === 'taller') actualizarTaller(lectura);
+    else if (lectura.listo && lectura.hayDatos && !enCinematica) aplicarLectura(sesion, lectura);
     requestAnimationFrame(bucle);
   };
   requestAnimationFrame(bucle);

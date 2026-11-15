@@ -5,6 +5,8 @@
 // al armar corre al revés, así que las piezas vuelven exactamente a su sitio (factor 0 = desplazamiento 0).
 
 export const DURACION_DESARME_S = 1.2;
+/** Con el gesto de las manos el cambio es rápido: el reloj corre este número de veces más deprisa (1.2 s → 0.4 s). */
+export const VELOCIDAD_DESARME_GESTO = 3;
 /** Retraso máximo de una pieza respecto al inicio (s). Cada pieza se mueve durante DURACION_DESARME_S − este valor. */
 export const RETRASO_MAX_S = 0.4;
 /** Separación mínima de una pieza al desarmar (m) y lo que se suma por cada metro que ya estaba del centro. */
@@ -72,6 +74,8 @@ export function desplazamiento(plan: PlanPieza, t: number): V3 {
 export class RelojDesarme {
   private reloj = 0;
   private haciaDesarmado = false;
+  /** Multiplicador del avance del reloj: 1 con la tecla, el botón o la barra; VELOCIDAD_DESARME_GESTO con las manos. */
+  private velocidad = 1;
 
   /** Segundos del reloj (0 – DURACION_DESARME_S). */
   get t(): number {
@@ -92,16 +96,27 @@ export class RelojDesarme {
   /** Alterna entre armado y desarmado; si está a medias, da la vuelta desde donde esté. */
   alternar(): void {
     this.haciaDesarmado = !this.haciaDesarmado;
+    this.velocidad = 1;
+  }
+
+  /**
+   * Pide el sentido del desarme (true = desarmar, false = armar); si ya va o está así, no cambia el sentido. `velocidad`
+   * multiplica el avance hasta la próxima orden (por defecto 1).
+   */
+  dirigir(desarmar: boolean, velocidad = 1): void {
+    this.haciaDesarmado = desarmar;
+    this.velocidad = Math.max(0.1, velocidad);
   }
 
   /** Pone el reloj en `progreso` (0–1) a mano (la barra) y lo deja quieto. */
   fijar(progreso: number): void {
     this.reloj = Math.min(1, Math.max(0, progreso)) * DURACION_DESARME_S;
     this.haciaDesarmado = this.reloj >= DURACION_DESARME_S / 2;
+    this.velocidad = 1;
   }
 
   avanzar(dtS: number): void {
-    const dt = Math.max(0, dtS);
+    const dt = Math.max(0, dtS) * this.velocidad;
     this.reloj = this.haciaDesarmado ? Math.min(DURACION_DESARME_S, this.reloj + dt) : Math.max(0, this.reloj - dt);
   }
 }

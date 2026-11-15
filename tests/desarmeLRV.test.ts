@@ -51,3 +51,28 @@ test('desarmar dura unos 1.2 s y el movimiento está escalonado', () => {
   assert.ok(retrasos.size > 50);
   assert.ok(Math.max(...plan.map((p) => p.retrasoS)) < DURACION_DESARME_S / 2);
 });
+
+test('con la velocidad del gesto desarmar y armar son varias veces más rápidos, y la tecla vuelve a la normal', () => {
+  const reloj = new RelojDesarme();
+  const tardanza = (): number => {
+    let t = 0;
+    const antes = reloj.estado;
+    while (reloj.estado === antes || reloj.estado === 'desarmando' || reloj.estado === 'armando') {
+      reloj.avanzar(1 / 60);
+      t += 1 / 60;
+      if (t > 10) break;
+    }
+    return t;
+  };
+  reloj.dirigir(true, 3);
+  assert.ok(Math.abs(tardanza() - DURACION_DESARME_S / 3) < 0.05);
+  assert.equal(reloj.estado, 'desarmado');
+  reloj.dirigir(false, 3);
+  assert.ok(Math.abs(tardanza() - DURACION_DESARME_S / 3) < 0.05);
+  assert.equal(reloj.estado, 'armado');
+  reloj.dirigir(true, 3);
+  reloj.alternar(); // la D o el botón: velocidad normal otra vez
+  reloj.alternar();
+  reloj.avanzar(1 / 60);
+  assert.ok(reloj.t <= 1 / 60 + 1e-9);
+});

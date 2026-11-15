@@ -234,6 +234,69 @@ export function pellizco(
 }
 
 // ---------------------------------------------------------------------------
+// Separar y juntar las manos: desarmar y armar el LRV en el taller 3D
+// ---------------------------------------------------------------------------
+
+/** Distancia entre las palmas (en anchos de hombros) por debajo de la cual las manos cuentan como juntas (puños frente al pecho). */
+export const SEPARAR_CERCA_HOMBROS = 0.7;
+/** Distancia por encima de la cual cuentan como separadas del todo (brazos abiertos a los lados). */
+export const SEPARAR_LEJOS_HOMBROS = 0.99;
+/** Tiempo máximo (s) entre haber visto las manos en un extremo y verlas en el otro: es un solo movimiento. */
+export const SEPARAR_VENTANA_S = 1.0;
+/** Tras un gesto, tiempo (s) sin otro. */
+export const SEPARAR_COOLDOWN_S = 0.5;
+
+/** 'separar': de juntas a separadas (desarmar). 'juntar': de separadas a juntas (armar). */
+export type GestoManos = 'separar' | 'juntar';
+
+export interface SepararManosEstado {
+  /** Último instante (s) en que se vieron las manos juntas; null si no hay un "juntas" reciente. */
+  juntasS: number | null;
+  /** Último instante (s) en que se vieron separadas; null si no hay un "separadas" reciente. */
+  separadasS: number | null;
+  /** Último gesto (s), para el cooldown. */
+  ultimoS: number;
+}
+
+export const separarManosEstadoInicial: SepararManosEstado = {
+  juntasS: null,
+  separadasS: null,
+  ultimoS: Number.NEGATIVE_INFINITY,
+};
+
+/**
+ * Manos juntas frente al pecho que se abren hacia los lados ('separar'), y de vuelta a juntarse ('juntar'). Mide la
+ * distancia entre las palmas en anchos de hombros (como el aplauso, pero aquí las manos se alejan despacio y se
+ * quedan separadas). Cada gesto es el paso de un extremo (< SEPARAR_CERCA_HOMBROS o > SEPARAR_LEJOS_HOMBROS) al otro
+ * en menos de SEPARAR_VENTANA_S, contada desde la última vez que se vio el primero: si el detector pierde una mano en
+ * pleno movimiento, el extremo anterior se recuerda esa ventana. Tras un gesto hay que volver al otro extremo antes de
+ * repetirlo, así que no dispara dos veces seguidas el mismo. Función pura.
+ */
+export function separarManos(
+  hands: TrackedHand[],
+  shoulderPx: number | null,
+  w: number,
+  h: number,
+  previo: SepararManosEstado,
+  ahoraS: number,
+): { gesto: GestoManos | null; estado: SepararManosEstado } {
+  const estado: SepararManosEstado = { ...previo };
+  if (estado.juntasS !== null && ahoraS - estado.juntasS > SEPARAR_VENTANA_S) estado.juntasS = null;
+  if (estado.separadasS !== null && ahoraS - estado.separadasS > SEPARAR_VENTANA_S) estado.separadasS = null;
+  const ratio = palmDistanceRatio(hands, shoulderPx, w, h);
+  if (ratio === null) return { gesto: null, estado };
+  const libre = ahoraS - estado.ultimoS >= SEPARAR_COOLDOWN_S;
+  if (ratio < SEPARAR_CERCA_HOMBROS) {
+    if (libre && estado.separadasS !== null) return { gesto: 'juntar', estado: { juntasS: ahoraS, separadasS: null, ultimoS: ahoraS } };
+    estado.juntasS = ahoraS;
+  } else if (ratio > SEPARAR_LEJOS_HOMBROS) {
+    if (libre && estado.juntasS !== null) return { gesto: 'separar', estado: { juntasS: null, separadasS: ahoraS, ultimoS: ahoraS } };
+    estado.separadasS = ahoraS;
+  }
+  return { gesto: null, estado };
+}
+
+// ---------------------------------------------------------------------------
 // Pellizco doble sostenido: bajarse del LRV (misión lunar)
 // ---------------------------------------------------------------------------
 

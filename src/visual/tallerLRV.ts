@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { RelojDesarme, desplazamiento, planDeDesarme, type EstadoDesarme, type PlanPieza, type V3 } from '../game/desarmeLRV';
+import { RelojDesarme, VELOCIDAD_DESARME_GESTO, desplazamiento, planDeDesarme, type EstadoDesarme, type PlanPieza, type V3 } from '../game/desarmeLRV';
 import { infoPieza, type GrupoLRV } from '../game/piezasLRV';
 import { crearPiezasLRV, type PiezaLRV } from './lrv';
 
@@ -9,7 +9,8 @@ import { crearPiezasLRV, type PiezaLRV } from './lrv';
 // Aquí viven la escena, la cámara tipo TinkerCAD (OrbitControls de Three.js: arrastrar orbita, Shift o clic derecho
 // desplaza; sin zoom: la rueda no hace nada y la distancia es fija), el teclado de cámara y el clic sobre una pieza.
 // Con el teclado la cámara se mueve por un «carril»: la distancia al vehículo es el radio y las flechas (o W A S) la llevan a la derecha, a la izquierda,
-// arriba o abajo sobre esa esfera, mirando siempre al centro; el radio no cambia nunca. D, F (centra la pieza elegida) y M
+// arriba o abajo sobre esa esfera, mirando siempre al centro; el radio no cambia nunca. Con la cámara web, la inclinación
+// y el cabeceo de la cabeza llevan a la cámara por ese mismo carril (`orbitar`), y el dedo índice elige piezas (`bajoPunto`). D, F (centra la pieza elegida) y M
 // los atiende la interfaz (ui/tallerUi.ts), porque D ya es "desarmar".
 
 const FONDO = 0xf4f3ef;
@@ -74,6 +75,8 @@ export interface TallerVisual {
   ajustar(ancho: number, alto: number): void;
   /** Alterna armado ⇄ desarmado. */
   alternar(): void;
+  /** Desarma (true) o arma (false) a la velocidad del gesto de las manos (rápido); si ya está así, no hace nada. */
+  fijarDesarme(desarmado: boolean): void;
   /** Pone el desarme en `progreso` (0–1) a mano. */
   fijarProgreso(progreso: number): void;
   seleccionar(indice: number | null): void;
@@ -81,6 +84,20 @@ export interface TallerVisual {
   resaltarGrupo(grupo: GrupoLRV | null): void;
   /** Gira la cámara despacio alrededor del modelo. */
   girar(activo: boolean): void;
+  /**
+   * Mueve la cámara por el carril (la esfera de radio fijo alrededor del vehículo), como las flechas: `ladoGrados` a la
+   * derecha (+) o a la izquierda (−) y `arribaGrados` hacia arriba (+) o abajo (−). Lo usa la cabeza con la cámara.
+   */
+  orbitar(ladoGrados: number, arribaGrados: number): void;
+  /**
+   * Qué hay bajo un punto de la pantalla (px de ventana): la pieza (o null si es fondo) y si el punto cae sobre el lienzo
+   * (false si hay un panel de la interfaz encima: entonces tampoco hay pieza). Lo usa el dedo que señala.
+   */
+  bajoPunto(x: number, y: number): { pieza: number | null; sobreLienzo: boolean };
+  /** Elige una pieza (o suelta la elegida con null) como el clic del ratón: abre o cierra su tarjeta. */
+  elegirPieza(indice: number | null): void;
+  /** Pieza elegida ahora, o null. */
+  readonly elegida: number | null;
   /** Posición actual de una pieza (m, en el mundo del taller), para pruebas. */
   posicionPieza(indice: number): THREE.Vector3;
   /** Posición de montaje de una pieza (m, en el mundo del taller), para pruebas. */
@@ -311,15 +328,20 @@ export function crearTallerVisual(renderer: THREE.WebGLRenderer): TallerVisual {
     const lado = (pulsadas.has('ArrowRight') ? 1 : 0) - tecla('KeyA', 'ArrowLeft');
     const vertical = tecla('KeyW', 'ArrowUp') - tecla('KeyS', 'ArrowDown');
     if (lado === 0 && vertical === 0) return;
+    moverPorCarril(lado * VELOCIDAD_ORBITA_RAD_S * dtS, vertical * VELOCIDAD_ORBITA_RAD_S * dtS);
+  }
+
+  /** Lleva la cámara `ladoRad` a la derecha y `arribaRad` hacia arriba por la esfera de radio fijo (teclas y cabeza). */
+  function moverPorCarril(ladoRad: number, arribaRad: number): void {
+    if (!controles) return;
     camara.updateMatrixWorld();
     _derecha.setFromMatrixColumn(camara.matrixWorld, 0);
     _arriba.setFromMatrixColumn(camara.matrixWorld, 1);
     _desfase.subVectors(camara.position, controles.target);
     const radio = _desfase.length();
     if (radio < 1e-6) return;
-    const paso = VELOCIDAD_ORBITA_RAD_S * dtS * radio;
     // Un paso por la derecha y por arriba de la cámara, y de vuelta a la esfera: es un giro alrededor del objetivo.
-    _desfase.addScaledVector(_derecha, lado * paso).addScaledVector(_arriba, vertical * paso).setLength(radio);
+    _desfase.addScaledVector(_derecha, ladoRad * radio).addScaledVector(_arriba, arribaRad * radio).setLength(radio);
     _esfera.setFromVector3(_desfase);
     _esfera.phi = THREE.MathUtils.clamp(_esfera.phi, MARGEN_POLO, Math.PI - MARGEN_POLO);
     _desfase.setFromSpherical(_esfera);
@@ -418,6 +440,9 @@ export function crearTallerVisual(renderer: THREE.WebGLRenderer): TallerVisual {
     alternar() {
       reloj.alternar();
     },
+    fijarDesarme(desarmado) {
+      reloj.dirigir(desarmado, VELOCIDAD_DESARME_GESTO);
+    },
     fijarProgreso(p) {
       reloj.fijar(p);
     },
@@ -425,6 +450,21 @@ export function crearTallerVisual(renderer: THREE.WebGLRenderer): TallerVisual {
       seleccionar(indice);
     },
     resaltarGrupo,
+    orbitar(ladoGrados, arribaGrados) {
+      if (ladoGrados === 0 && arribaGrados === 0) return;
+      moverPorCarril(THREE.MathUtils.degToRad(ladoGrados), THREE.MathUtils.degToRad(arribaGrados));
+    },
+    bajoPunto(x, y) {
+      // Un panel de la interfaz encima del punto lo tapa: ahí no hay pieza ni fondo, solo interfaz.
+      if (document.elementFromPoint(x, y) !== lienzo) return { pieza: null, sobreLienzo: false };
+      return { pieza: piezaEn(x, y), sobreLienzo: true };
+    },
+    elegirPieza(indice) {
+      elegirDeTecho(indice);
+    },
+    get elegida() {
+      return elegida;
+    },
     girar(activo) {
       if (controles) controles.autoRotate = activo;
     },
