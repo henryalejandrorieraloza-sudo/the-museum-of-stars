@@ -251,6 +251,18 @@
     0 2px 4px rgba(0, 0, 0, 0.85);
 }
 
+/* Símbolo del gesto que pide la caja (👌: juntar el pulgar y el índice), a la derecha del texto. */
+.instruccion-simbolo {
+  flex: none;
+  font-size: clamp(30px, 5.4vh, 54px);
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7));
+}
+
+.instruccion-simbolo[hidden] {
+  display: none;
+}
+
 @keyframes instruccion-entra {
   from {
     opacity: 0;

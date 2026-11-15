@@ -32,7 +32,8 @@ import {
   type Opciones,
 } from './opciones';
 import { Museo, type EventoMuseo } from './museo';
-import { MisionLuna, metrosAPieLuna, type EntradaLuna, type EstadoLuna } from './luna';
+import { MisionLuna, VELOCIDAD_PARADO_M_S, metrosAPieLuna, type EntradaLuna, type EstadoLuna } from './luna';
+import type { PosicionMando } from './mandoLRV';
 import { avanzarAnilloMantener, DespliegueLRV } from './despliegueLRV';
 import { SueloNaranja } from './sueloNaranja';
 import { BalanceoCaminata, type EntradaBalanceo } from './balanceo';
@@ -71,6 +72,10 @@ let saludoDado = false;
 let vitrinaElegida = false;
 /** Paso que la caja de instrucción muestra ahora (“Aprieta espacio…”), o null. */
 let pasoActual: ClaveTexto | null = null;
+/** Pantalla de modos: opción elegida que Robi ya describió (null si ninguna). Con ella, la caja pide confirmar. */
+let modoExplicado: ModoApp | null = null;
+/** Pasos que se hacen juntando el pulgar y el índice: con cámara, la caja muestra el símbolo 👌. */
+const PASOS_PELLIZCO: readonly ClaveTexto[] = ['entrar_aplauso', 'instr_subir', 'instr_bajar'];
 /** La voz ya dijo "Aprieta espacio para subirte" en esta visita: hasta entonces, el aplauso no sube al LRV. */
 let subidaLista = false;
 /** La voz ya explicó cómo conducir en esta visita: hasta entonces, caminar no mueve el LRV. */
@@ -126,7 +131,6 @@ let modoControl: ModoControl = 'camara';
 /** Frase de voz de cada estado de la misión. `entrando_museo` se dice al abrir la escena, no aquí. */
 const FRASES_LUNA: Partial<Record<EstadoLuna, ClaveTexto>> = {
   sentado_en_LRV: 'luna_sentado_en_LRV',
-  golpeando: 'luna_golpeando',
 };
 
 /**
@@ -153,8 +157,6 @@ const TEXTO_TECLADO: Partial<Record<ClaveTexto, ClaveTexto>> = {
   luna_entrando_museo: 'luna_entrando_museo_teclado',
   luna_lejos_LRV: 'luna_lejos_LRV_teclado',
   luna_LRV_desplegado: 'luna_LRV_desplegado_teclado',
-  luna_cerca_de_roca: 'luna_cerca_de_roca_teclado',
-  luna_golpeando: 'luna_golpeando_teclado',
   luna_mision_salida: 'luna_mision_salida_teclado',
   luna_bajado: 'luna_bajado_teclado',
   luna_bajado_muestra: 'luna_bajado_muestra_teclado',
@@ -167,8 +169,7 @@ const TEXTO_TECLADO: Partial<Record<ClaveTexto, ClaveTexto>> = {
   instr_senalar: 'instr_senalar_teclado',
   instr_desplegar: 'instr_desplegar_teclado',
   instr_subir: 'instr_subir_teclado',
-  instr_golpear: 'instr_golpear_teclado',
-  instr_agarrar: 'instr_agarrar_teclado',
+  instr_bajar: 'instr_bajar_teclado',
   instr_recoger: 'instr_recoger_teclado',
   instr_volver: 'instr_volver_teclado',
 };
@@ -385,6 +386,7 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
           // Exploración libre: solo el moon buggy en la Luna. El jugador ya va sentado, con el LRV desplegado, y no hay
           // misión, roca ni suelo naranja: se conduce, se baja y se sube cuando se quiere.
           mision = new MisionLuna('sentado_en_LRV', undefined, undefined, true);
+          fuenteActiva?.recentrarMando();
           despliegue = new DespliegueLRV('desplegado');
           visual.museo.poseDespliegueLRV(DURACION_DESPLIEGUE_LRV_S, 0);
           ultimoDespliegueS = null;
@@ -558,7 +560,6 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
   const balanceo = new BalanceoCaminata();
 
   // --- Pantalla de modos y taller 3D ---------------------------------------------------------------------------
-  let modoExplicado: ModoApp | null = null;
   // Opción elegida (señalada hasta llenar el anillo, o enfocada con Tab): Robi la describe en ese momento y dice cómo entrar.
   modos.alSeleccionar((modo) => {
     modoExplicado = modo;
@@ -763,12 +764,15 @@ export async function iniciarJuego(container: HTMLElement): Promise<void> {
  * Se mira en cada vuelta del bucle: en cuanto el estado cambia, la caja cambia o desaparece.
  */
 function pasoPendiente(sesion: Sesion): ClaveTexto | null {
-  // Con una pausa, una pantalla o una cinemática encima, no se pide nada.
-  if (motivosPausaEntrada.size > 0 || cinematicaActiva() || presentacion !== null) return null;
+  // Pantalla de modos: con una opción ya elegida y descrita, se pide confirmarla (y en cuanto se entra, se va).
+  const soloModos = motivosPausaEntrada.size === 1 && motivosPausaEntrada.has('menu');
+  // Con otra pausa, una pantalla o una cinemática encima, no se pide nada.
+  if ((motivosPausaEntrada.size > 0 && !soloModos) || cinematicaActiva() || presentacion !== null) return null;
   // Robi todavía habla (o le queda una frase en cola): primero termina, y solo después se pide la acción.
   if (mentorHablando || colaFrases.length > 0) return null;
   // Y el subtítulo de Robi sigue en pantalla (se quita unos instantes después de la voz): la caja espera a que desaparezca.
   if (sesion.ui.subtitulosVisibles()) return null;
+  if (soloModos) return modoExplicado !== null ? 'entrar_aplauso' : null;
   const { museo } = sesion;
   if (mision === null) {
     if (museo.pantalla.tipo !== 'museo') return null;
@@ -782,17 +786,18 @@ function pasoPendiente(sesion: Sesion): ClaveTexto | null {
     return volverAnillo === 0 && !cinematicaActiva() ? 'instr_volver' : null;
   }
   if (despliegue?.estado === 'plegado') return instruccionDesplegarDicha ? 'instr_desplegar' : null;
-  if (mision.estado === 'cerca_de_roca') return 'instr_golpear';
-  if (mision.estado === 'golpeando') return 'instr_agarrar';
   if (sueloNaranja?.listoParaRecoger) return 'instr_recoger';
   if (mision.aPie && subidaLista && despliegue?.desplegado === true) return 'instr_subir';
+  // Sentado y parado (ya explicados los controles): cómo conducir o bajarse. En cuanto el LRV se mueve, se va.
+  if (!mision.aPie && conduccionLista && Math.abs(mision.velocidad) <= VELOCIDAD_PARADO_M_S) return 'instr_bajar';
   return null;
 }
 
 /** Pone en la caja el paso pendiente (con el texto del idioma y del control activos). */
 function mostrarPaso(sesion: Sesion): void {
   pasoActual = pasoPendiente(sesion);
-  sesion.instruccion.mostrar(pasoActual === null ? null : texto(pasoActual));
+  const pellizco = modoControl === 'camara' && pasoActual !== null && PASOS_PELLIZCO.includes(pasoActual);
+  sesion.instruccion.mostrar(pasoActual === null ? null : texto(pasoActual), pellizco ? 'pellizco' : null);
 }
 
 /** Estado que persiste entre fotogramas. */
@@ -1079,8 +1084,8 @@ function aplicarLectura(sesion: Sesion, lectura: LecturaEntrada): void {
   const { ahoraS } = lectura;
   const apuntando = senalar(sesion, lectura.senal);
 
-  // Escena lunar: volante, caminata, golpe y agarre van a la máquina de estados (SPEC 8).
-  // A pie, el jugador camina y mira como en el museo; sentado, la caminata mueve el LRV y el giro solo la vista.
+  // Escena lunar: caminata, palanca del mando y aplauso van a la máquina de estados (SPEC 8).
+  // A pie, el jugador camina y mira como en el museo; sentado, la palanca mueve el LRV y el giro solo la vista.
   if (mision !== null) {
     const aPie = mision.aPie;
     // Misión cumplida: se puede mirar alrededor, pero no caminar (ni de lado).
@@ -1092,23 +1097,28 @@ function aplicarLectura(sesion: Sesion, lectura: LecturaEntrada): void {
     }
     const volver = volverPedido;
     volverPedido = false;
-    aplicarLuna(sesion, {
-      ahoraS,
-      dtS: lectura.dtS,
-      // A pie con el LRV ya desplegado, el aplauso no sube hasta que la voz diga cómo hacerlo.
-      aplauso: lectura.aplauso && (!aPie || subidaLista || despliegue?.desplegado !== true),
-      aplausoVuelve: lectura.aplausoVuelve,
-      volver,
-      // Sentado, caminar mueve el LRV solo cuando la voz ya explicó cómo conducir.
-      metros: aPie || !conduccionLista ? 0 : lectura.avanceM,
-      jugador: visual.museo.posicionJugador(),
-      volanteGrados: lectura.volanteGrados,
-      velocidadGolpeHombrosS: lectura.golpeHombrosS,
-      agarreNuevo: lectura.agarreNuevo,
-      // Mientras suena la explicación de los controles (la primera vez al subirte), B no baja del LRV.
-      bajarse: lectura.bajarse && !(mentorHablando && habla?.clave === 'luna_sentado_en_LRV'),
-      lrvDesplegado: despliegue?.desplegado ?? true,
-    });
+    // Mientras suena la explicación de los controles (la primera vez al subirte), ni B ni el aplauso bajan del LRV.
+    // Con cámara el aplauso llega también como confirmar: sentado se ignora entero, para no volver al museo.
+    const bajadaBloqueada = mentorHablando && habla?.clave === 'luna_sentado_en_LRV';
+    const okSentadoIgnorado = !aPie && lectura.bajarse && bajadaBloqueada;
+    // Sentado, la palanca acelera el LRV solo cuando la voz ya explicó cómo conducir; antes solo gira las ruedas.
+    const mando = conduccionLista || lectura.mando === null ? lectura.mando : { adelante: 0, lado: lectura.mando.lado };
+    aplicarLuna(
+      sesion,
+      {
+        ahoraS,
+        dtS: lectura.dtS,
+        // A pie con el LRV ya desplegado, el aplauso no sube hasta que la voz diga cómo hacerlo.
+        aplauso: lectura.aplauso && !okSentadoIgnorado && (!aPie || subidaLista || despliegue?.desplegado !== true),
+        aplausoVuelve: lectura.aplausoVuelve,
+        volver,
+        mando,
+        jugador: visual.museo.posicionJugador(),
+        bajarse: lectura.bajarse && !bajadaBloqueada,
+        lrvDesplegado: despliegue?.desplegado ?? true,
+      },
+      lectura.mando,
+    );
     return;
   }
 
@@ -1135,7 +1145,7 @@ function aplicarLectura(sesion: Sesion, lectura: LecturaEntrada): void {
 
 /**
  * ¿Está el jugador manteniendo la acción de carga? Teclado: la tecla E. Cámara: el puño cerrado (o la E, de respaldo).
- * Sentado en el LRV el puño no cuenta, porque ahí las manos sujetan el volante y suelen ir cerradas.
+ * Sentado en el LRV el puño no cuenta, porque ahí la mano derecha sujeta la palanca del mando, cerrada.
  */
 function cargaMantenida(lectura: LecturaEntrada): boolean {
   if (!lectura.listo) return false;
@@ -1143,14 +1153,14 @@ function cargaMantenida(lectura: LecturaEntrada): boolean {
   return lectura.desplegarMantenido || (lectura.punoMantenido && !sentado);
 }
 
-/** ¿Cuenta el aplauso como acción de museo? Dentro de una misión solo vuelve si la fuente lo permite (cámara). */
+/** ¿Cuenta el aplauso (o espacio) como acción de museo? Dentro de una misión solo vuelve si la fuente lo permite (cámara). */
 function accionDeAplauso(sesion: Sesion, lectura: LecturaEntrada): boolean {
   return lectura.aplauso && (sesion.museo.pantalla.tipo !== 'mision' || lectura.aplausoVuelve);
 }
 
 /**
  * Volver al museo manteniendo E, en cada vuelta del bucle (como el despliegue). Es la acción de carga por defecto de la
- * misión: solo cuenta cuando E no está desplegando el LRV, recogiendo el suelo naranja ni golpeando la roca, y hay que
+ * misión: solo cuenta cuando E no está desplegando el LRV ni recogiendo el suelo naranja, y hay que
  * soltarla entre una acción y otra (si no, al terminar de desplegar o recoger volverías sin querer).
  */
 function actualizarVolver(sesion: Sesion, lectura: LecturaEntrada, enCinematica: boolean): void {
@@ -1165,8 +1175,6 @@ function actualizarVolver(sesion: Sesion, lectura: LecturaEntrada, enCinematica:
     mision !== null &&
     (despliegue?.estado !== 'desplegado' ||
       (sueloNaranja?.anilloProgreso ?? 0) > 0 ||
-      mision.estado === 'cerca_de_roca' ||
-      mision.estado === 'golpeando' ||
       mision.estado === 'volviendo');
   if (mantenida && (ocupada || !enMision)) volverArmado = false;
   const cargando = enMision && mantenida && volverArmado;
@@ -1276,10 +1284,16 @@ function celebrarMision(sesion: Sesion): void {
   });
 }
 
-/** Avanza la misión lunar un fotograma, actualiza la escena y reacciona a los eventos (voz, volver). */
-function aplicarLuna(sesion: Sesion, entrada: EntradaLuna): void {
+/**
+ * Avanza la misión lunar un fotograma, actualiza la escena y reacciona a los eventos (voz, volver). `mandoVisto` es la
+ * palanca tal como la mueve el jugador (para dibujarla con su mano), aunque todavía no acelere el LRV.
+ */
+function aplicarLuna(sesion: Sesion, entrada: EntradaLuna, mandoVisto: PosicionMando | null): void {
   if (mision === null || sesion.museo.enTransicion) return;
+  const estabaAPie = mision.aPie;
   const eventos = mision.update(entrada);
+  // Al sentarse, la palanca toma de nuevo el punto neutro de la mano derecha (game/mandoLRV.ts).
+  if (estabaAPie && !mision.aPie) sesion.fuente.recentrarMando();
   visual.museo.actualizarLuna({
     x: mision.posicion.x,
     z: mision.posicion.z,
@@ -1289,16 +1303,18 @@ function aplicarLuna(sesion: Sesion, entrada: EntradaLuna): void {
     sentado: !mision.aPie,
     // El halo azul marca el suelo naranja: desaparece al recoger la muestra (y al volver a la misión, sigue oculto).
     haloVisible: mision.haloVisible && !(sueloNaranja?.recogidoYa ?? false),
+    mando: mandoVisto,
+    marchaAtras: mision.marchaAtras,
   });
   for (const evento of eventos) {
     if (evento.tipo === 'estado') {
       const clave = FRASES_LUNA[evento.estado];
-      // Muestra por el golpe con el LRV: misma celebración que recoger el suelo con E.
+      // Sentado con la muestra ya recogida: misma celebración que recoger el suelo con E.
       if (evento.estado === 'muestra_recogida') {
         celebrarMision(sesion);
       } else if (evento.estado === 'sentado_en_LRV') {
-        // La primera vez de la sesión se explican los controles; después, solo "anda más". Hasta que termine la frase,
-        // caminar no mueve el LRV.
+        // La primera vez de la sesión se explican los controles; después, solo "a bordo". Hasta que termine la frase,
+        // la palanca no acelera el LRV.
         const clave = yaDichas.has('luna_sentado_en_LRV') ? 'luna_sentado_otra' : 'luna_sentado_en_LRV';
         yaDichas.add('luna_sentado_en_LRV');
         decirFrase(sesion.voz, sesion.ui, clave, () => {
@@ -1307,8 +1323,6 @@ function aplicarLuna(sesion: Sesion, entrada: EntradaLuna): void {
       } else if (clave) {
         decirFrase(sesion.voz, sesion.ui, clave);
       }
-    } else if (evento.tipo === 'golpeFallido') {
-      decirFrase(sesion.voz, sesion.ui, 'luna_golpe_fallido');
     } else if (evento.tipo === 'bajado') {
       // La primera bajada de la sesión dice que te bajaste; las siguientes, solo que estás afuera.
       const clave = yaDichas.has('luna_te_bajaste') ? 'luna_afuera' : 'luna_te_bajaste';

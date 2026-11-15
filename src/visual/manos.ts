@@ -53,7 +53,14 @@ export interface ManosAvatar {
    * `opciones.separacion` (m): separación total entre manos; cada una se desplaza la mitad hacia su lado en x.
    */
   actualizar(manos: ManoDetectada[], vista: VistaCamara, opciones: OpcionesManos): void;
+  /** Oculta las manos que siguen al seguimiento. Una mano fijada (ver `fijar`) sigue a la vista. */
   ocultar(): void;
+  /**
+   * Fija una mano en `padre` con la forma `puntos` (21 puntos, en ejes de `padre`): deja de seguir a la mano real,
+   * no se oculta sin detección y se mueve con `padre`. Con null vuelve a colgar de la cámara y a seguir a la mano real.
+   * Sirve para la mano derecha agarrada a la palanca del LRV (SPEC 8.2).
+   */
+  fijar(lado: 'Left' | 'Right', fija: { padre: THREE.Object3D; puntos: Vec3[] } | null): void;
 }
 
 interface ManoVisual {
@@ -110,6 +117,8 @@ export function crearManos(): ManosAvatar {
   };
 
   const manos: Record<'Left' | 'Right', ManoVisual> = { Left: crearMano('Left'), Right: crearMano('Right') };
+  /** Manos fijadas en otro objeto (fijar): el seguimiento no las mueve ni las oculta. */
+  const fijadas: Record<'Left' | 'Right', boolean> = { Left: false, Right: false };
 
   // Vectores y matrices reutilizados: el dibujo de cada fotograma no reserva memoria nueva.
   const ejeX = new THREE.Vector3();
@@ -223,6 +232,7 @@ export function crearManos(): ManosAvatar {
     objeto: raiz,
     actualizar(detectadas, vista, opciones) {
       for (const lado of ['Left', 'Right'] as const) {
+        if (fijadas[lado]) continue;
         const mano = manos[lado];
         // Solo se desplaza la posición en x de la mano; su tamaño y forma no cambian.
         mano.grupo.position.x = (lado === 'Left' ? -1 : 1) * (opciones.separacion / 2);
@@ -261,11 +271,30 @@ export function crearManos(): ManosAvatar {
       }
     },
     ocultar() {
-      for (const mano of [manos.Left, manos.Right]) {
+      for (const lado of ['Left', 'Right'] as const) {
+        if (fijadas[lado]) continue;
+        const mano = manos[lado];
         ocultarMano(mano);
         mano.pose = null;
         mano.ultimaDeteccionS = null;
         mano.deslizar = null;
+      }
+    },
+    fijar(lado, fija) {
+      const mano = manos[lado];
+      mano.pose = null;
+      mano.ultimaDeteccionS = null;
+      mano.deslizar = null;
+      mano.ultimosPuntos = null;
+      if (fija) {
+        fijadas[lado] = true;
+        fija.padre.add(mano.grupo);
+        mano.grupo.position.set(0, 0, 0);
+        dibujar(mano, fija.puntos);
+      } else if (fijadas[lado]) {
+        fijadas[lado] = false;
+        raiz.add(mano.grupo);
+        ocultarMano(mano);
       }
     },
   };

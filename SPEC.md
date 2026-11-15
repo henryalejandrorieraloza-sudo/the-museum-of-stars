@@ -31,7 +31,7 @@ Proyecto educativo y narrativo en una página web pública. El jugador recorre u
   - **Cara:** roll de la cabeza (inclinación lateral) y cabeceo (subir o bajar la cabeza, desde la matriz de pose de la cara). El yaw (girar la cara) no cuenta.
   - **Rodillas:** altura relativa respecto a la cadera, para detectar caminar (sección 5.1).
   - **Hombros:** solo referencia de postura. No se usan para caminar.
-  - **Manos:** landmarks para volante, cursor, pellizco, aplauso y señalar.
+  - **Manos:** landmarks para la palanca del LRV (mano derecha), cursor, pellizco y señalar.
 
 **Estado actual:** el código base compila y la escena renderiza. El seguimiento de cara, cuerpo y manos está verificado con cámara real. La detección de caminar por rodillas está implementada, pero sus umbrales aún no se han validado (ver sección 14).
 
@@ -64,16 +64,16 @@ Proyecto educativo y narrativo en una página web pública. El jugador recorre u
 | Girar la vista en el museo | Inclinar la cabeza hacia un lado |
 | Mirar arriba o abajo en el museo | Subir o bajar la cabeza (límite ±35°) |
 | Señalar vitrina | Cursor con el dedo índice (por defecto). El rayo desde el hombro queda como opción |
-| Iniciar inmersión | Aplaudir |
-| Desplegar LRV (Apollo 17), recoger muestras y volver al museo desde la misión | Cámara: mantener el puño cerrado 3 s (anillo con un puño dentro). Teclado: mantener la tecla E 3 s. No cuenta sentado en el LRV, donde las manos hacen de volante. Señalar vitrinas sigue siendo con el índice |
-| Conducir LRV | Volante gestual con ambas manos |
-| Avanzar LRV | Subir las rodillas (caminar en el sitio) |
+| Iniciar inmersión | Pellizco: pulgar e índice juntos (sección 5.2) |
+| Desplegar LRV (Apollo 17), recoger muestras y volver al museo desde la misión | Cámara: mantener el puño cerrado 3 s (anillo con un puño dentro). Teclado: mantener la tecla E 3 s. No cuenta sentado en el LRV, donde la mano derecha sujeta la palanca. Señalar vitrinas sigue siendo con el índice |
+| Subir al LRV y bajarse | Pellizco (junto al LRV sube; sentado, baja) |
+| Conducir LRV | Mano derecha como la palanca del mando en T: adelante acelera, atrás frena y, ya parado, da marcha atrás; a los lados gira (sección 8.2). La mano izquierda queda libre |
 | Avanzar Perseverance | Inclinar una mano hacia arriba |
 | Retroceder Perseverance | Inclinar una mano hacia abajo |
 | Girar Perseverance | Inclinar la cabeza hacia un lado |
 | Seleccionar objetivo científico | Cursor con una mano + pellizco |
-| Recoger muestra (Apollo 17) | Golpe con una mano + agarre con la otra |
-| Volver al museo | Aplaudir |
+| Recoger muestra (Apollo 17) | A pie junto al suelo naranja: mantener el puño cerrado 3 s (teclado: E) |
+| Volver al museo | Pellizco, o mantener el puño cerrado en la misión |
 
 **Regla (giro proporcional):** la cabeza siempre mira al frente. El giro se detecta como inclinación lateral (roll), y el mirar arriba o abajo como cabeceo (pitch), con la misma regla y la misma zona muerta y sensibilidad. La velocidad de giro es proporcional a la inclinación:
 
@@ -102,11 +102,12 @@ Proyecto educativo y narrativo en una página web pública. El jugador recorre u
 - Si no hay pasos durante 0.5 s, el jugador se considera detenido.
 - `/debug/` muestra la señal en vivo, los picos (verde: contaron; gris: rechazados), la línea de amplitud mínima, el contador de pasos y la amplitud del último pico.
 
-### 5.2 Aplauso
+### 5.2 Pellizco de confirmar (sustituye al aplauso)
 
-- Se detecta cuando las dos manos se juntan (distancia entre muñecas o palmas bajo un umbral).
-- Cooldown de 1.5 s para evitar doble disparo.
-- Dispara la inmersión (museo → Luna o Marte) o el regreso al museo.
+- El aplauso ya no se usa en el juego (solo sigue en `/debug/`). Confirmar es el pellizco de pulgar e índice (sección 5.4, el mismo de Perseverance) con una mano o con las dos, en cuanto se cierra, como en Perseverance (`pellizcoConfirmar` en `src/tracking/gestures.ts`). Confirma una vez por pellizco: hay que abrir los dedos para repetir, con cooldown de 1 s.
+- Un puño cerrado no cuenta aunque el pulgar quede junto al índice: así la mano derecha en la palanca del LRV no confirma.
+- Entra a la vitrina (museo → Luna o Marte), elige modo, sube al LRV y vuelve al museo. Sentado en el LRV, el pellizco baja del LRV (y no vuelve al museo).
+- La barra espaciadora es su respaldo.
 
 ### 5.3 Señalar (dedo índice)
 
@@ -131,7 +132,7 @@ Proyecto educativo y narrativo en una página web pública. El jugador recorre u
 | Situación | Comportamiento |
 | --- | --- |
 | Pérdida de cabeza en Perseverance | El rover desacelera gradualmente en 1–2 s |
-| Pérdida de manos en LRV | El volante queda en el último ángulo y el vehículo desacelera gradualmente |
+| Pérdida de la mano derecha en el LRV | La palanca se queda donde estaba 0.4 s y luego vuelve sola al centro: el vehículo desacelera gradualmente. Sin ningún fotograma nuevo, las ruedas se quedan en el último ángulo |
 | Cara o cuerpo fuera de encuadre | El movimiento se congela. El juego no se pausa |
 | Rodillas perdidas durante el juego | El movimiento se congela, igual que cara o cuerpo fuera de encuadre. El juego no se pausa |
 | Rodillas sin pasos durante 0.5 s | El jugador se considera detenido |
@@ -153,8 +154,8 @@ Parte visual: ver spec-visual-museo.md.
 2. Gira la vista inclinando la cabeza.
 3. Señala una vitrina con el índice durante 1.5 s. La vitrina se resalta.
 4. El mentor empieza a hablar la explicación de la vitrina. Habla frase a frase, y cada frase aparece como subtítulo mientras suena.
-5. Cuando termina la última frase, aparece el texto “Aplaude para entrar (o pulsa espacio)”.
-6. El jugador aplaude o pulsa espacio. Se entra a la escena con fundido de 0.6 s:
+5. Cuando termina la última frase, aparece el texto “Junta el pulgar y el índice para entrar” (con teclado, “Pulsa espacio para entrar”).
+6. El jugador pellizca o pulsa espacio. Se entra a la escena con fundido de 0.6 s:
    - Vitrina del LRV → presentación del LRV (sección 7.4) y, al terminar, Luna, junto al LRV.
    - Vitrina de Perseverance → Marte, solo con Perseverance visible.
    - Vitrina de Cassini → todavía sin misión: al terminar la explicación no aparece el aviso de entrar, la vitrina se deselecciona y se puede elegir otra. No se vuelve a seleccionar hasta dejar de señalarla.
@@ -163,26 +164,26 @@ Parte visual: ver spec-visual-museo.md.
 **Reglas del flujo:**
 
 - **La explicación siempre termina.** Ningún evento la interrumpe: moverse, girar la cabeza, caminar, perder la cara o las manos, cambiar el método de señalar, pulsar otra tecla. La voz no se corta; el movimiento solo mueve la cámara.
-- **Durante la explicación, no se acepta ninguna selección nueva ni aplauso.** Si el jugador señala otra vitrina mientras habla, esa selección se ignora hasta que termine la voz.
+- **Durante la explicación, no se acepta ninguna selección nueva ni pellizco de confirmar.** Si el jugador señala otra vitrina mientras habla, esa selección se ignora hasta que termine la voz.
 - **Explicación por frases.** El texto se divide en frases. Se reproduce una frase y, al terminar (evento `onend`), pasa a la siguiente. Así Chrome no corta frases largas. Las referencias de cada `SpeechSynthesisUtterance` se guardan en un arreglo mientras dura la explicación, para que el navegador no las elimine.
 - **Respaldo sin voz.** Si no hay voces disponibles o la síntesis falla, los subtítulos se muestran igual y cada frase avanza con un temporizador de 15 caracteres por segundo. El flujo nunca se queda trabado. Si una frase con voz no envía su evento de fin, avanza tras su duración de respaldo más 5 s.
-- **Aviso al terminar.** Cuando termina la última frase, aparece el aviso “Aplaude para entrar”. Este aviso no depende de dónde está el jugador ni hacia dónde mira.
-- **Entrada.** Al aplaudir o pulsar espacio después del aviso, se entra a la escena de la vitrina seleccionada. No se comprueba la posición del jugador, la dirección de la cámara ni si la vitrina está en pantalla. Un aplauso durante la explicación no hace nada.
+- **Aviso al terminar.** Cuando termina la última frase, aparece el aviso “Junta el pulgar y el índice para entrar”. Este aviso no depende de dónde está el jugador ni hacia dónde mira.
+- **Entrada.** Al pellizcar o pulsar espacio después del aviso, se entra a la escena de la vitrina seleccionada. No se comprueba la posición del jugador, la dirección de la cámara ni si la vitrina está en pantalla. Un pellizco durante la explicación no hace nada.
 - **Selección bloqueada hasta entrar.** Desde que se selecciona una vitrina hasta que se entra, la selección no cambia. La vitrina sigue resaltada.
-- La barra espaciadora funciona en todo el flujo como respaldo del aplauso.
+- La barra espaciadora funciona en todo el flujo como respaldo del pellizco de confirmar.
 - En la escena, el texto de la sesión anterior (“misión en construcción”) se mantiene.
-- Para volver al museo, aplaude o pulsa espacio (sección 7.3). Después, el jugador puede señalar otra vitrina y empezar una nueva explicación.
+- Para volver al museo, pellizca o pulsa espacio (sección 7.3). Después, el jugador puede señalar otra vitrina y empezar una nueva explicación.
 
 ### 7.4 Presentación del LRV
 
 Animación corta e informativa entre la vitrina del LRV y la misión lunar. Guion y máquina de estados en `src/game/presentacionLRV.ts`; escena en `src/visual/presentacionLRV.ts`; rótulos y textos en pantalla en `src/ui/presentacionUi.ts`.
 
-- **Cuándo:** al aplaudir o pulsar espacio tras la explicación de la vitrina del LRV (la explicación y el aviso “Aplaude para entrar” no cambian). Al terminar, aparece “Estás listo para la misión”, el narrador lo dice y se entra a la Luna con el fundido de siempre. La misión es la misma de antes.
+- **Cuándo:** al pellizcar o pulsar espacio tras la explicación de la vitrina del LRV (la explicación y el aviso de entrar no cambian). Al terminar, aparece “Estás listo para la misión”, el narrador lo dice y se entra a la Luna con el fundido de siempre. La misión es la misma de antes.
 - **Contenido:** solo el LRV (el mismo modelo que se conduce, desplegado y cargado). Sin astronautas, personas ni sus sombras. Suelo de regolito gris, cielo negro con el Sol, la Tierra y las estrellas de la escena lunar, un solo Sol con sombras duras y el mismo render que la misión.
 - **Narrador:** la voz del mentor (el robot del museo), con la misma síntesis y el mismo catálogo de audio grabado. Una frase por tramo; cada tramo dura su mínimo o lo que tarde su frase, lo que sea mayor, así la imagen y los subtítulos no se desfasan. Si la voz nunca avisa del final, el tramo sigue a los 20 s de su mínimo.
 - **Cámara sincronizada con la frase:** cada plano empieza en la palabra que lo pide. En `es.json` y `en.json`, las frases `pres_*` llevan marcas `{@id}` justo antes de esa palabra (no se ven ni se dicen; `src/audio/guion.ts`). El guion de cada tramo (`anclas`, tomas y marcas en `src/game/presentacionLRV.ts`) está escrito en segundos “nominales” (lo que dura la frase en español) y el reloj (`RelojNarrado`) los lleva al tiempo real: cada ancla coincide con su palabra cuando la voz la dice, las que aún no han sonado se prevén con el ritmo de la voz (caracteres por segundo, medido en las frases anteriores o, con audio grabado, tomado de sus tiempos) y el último instante del guion cae en el final de la frase. Así el movimiento se estira o se encoge por idioma y por voz. Una marca que un idioma no tiene (p. ej. “Diseñadas para rodar por otro mundo” en inglés) se ignora con sus tomas y rótulos (`ancla` en `Toma` y `Marca`). Si la voz no avisa de una marca, el guion sigue su previsión. Además, la cámara respira siempre (`movimientoAmbiente`) y la última escena termina en un plano de revelación (el LRV entero y el terreno) que sigue, con una órbita lenta, bajo “Estás listo” (`TRAMO_LISTO`).
 - **Subtítulos:** abajo, sincronizados con la voz. Se apagan y encienden con la tecla C durante la animación (ya no hay casilla en Opciones).
-- **Saltar:** Enter, desde la segunda escena (la introducción siempre se ve). Salta a “Estás listo para la misión”. Durante la animación el museo no recibe entradas (ni moverse ni aplaudir).
+- **Saltar:** Enter, desde la segunda escena (la introducción siempre se ve). Salta a “Estás listo para la misión”. Durante la animación el museo no recibe entradas (ni moverse ni confirmar).
 - **Escenas, en orden** (guion de unos 126 s de narración en español, más la pausa entre frases y los fundidos; en inglés dura menos porque las frases son más cortas): introducción, peso con la tarjeta de la Tierra y la Luna, distancias, chasis, ruedas, electrónica y navegación (consola, giroscopio y odómetro, cámara y antenas con la Tierra en el cielo), energía con baterías y Mylar, mando y movimiento (vista dividida) y cierre en el suelo naranja del cráter Shorty, con fundidos suaves de 0.8 s entre escenas. Cámara con ease-in-out (curva cúbica monótona entre tomas, sin paradas en cada una), nunca quieta mientras habla el narrador, y con tope de velocidad (zoom ≤ ×1.6 por segundo, giro ≤ 16°/s) para que ningún movimiento sea brusco aunque la voz vaya más deprisa de lo previsto. Las piezas se resaltan con un contorno azul celeste y un rótulo en español que aparecen y se van en 0.5 s. Cada frase explica el porqué en pocas palabras.
 - **Distancias:** vista desde arriba con dos trazos sobre el mismo terreno: el corto (“Caminando”) y el largo (“Con el LRV: 36 km (Apolo 17)”), que se dibuja más rápido. Esquemáticos, con la proporción de 3.45 km a 36 km (EVA-2 del Apolo 14, la más larga a pie, frente al LRV del Apolo 17; NSSDC). No son recorridos reales.
 - **Mando y movimiento:** vista dividida: a la izquierda, el LRV desde arriba, que se mueve según el mando (adelante avanza, a un lado gira con el radio de giro de 3.1 m, atrás sin interruptor frena y con él retrocede); a la derecha, el primer plano del mando y su interruptor de marcha atrás. Después, el panel con “Potencia de tracción”, “Dirección” y “Habilitar tracción”. El LRV de esta escena se mueve a un máximo de 1.6 m/s adelante y 0.9 m/s atrás.
@@ -191,8 +192,8 @@ Animación corta e informativa entre la vitrina del LRV y la misión lunar. Guio
 
 ### 7.3 Regreso
 
-- Al terminar la misión, el mentor (voz en off) pide aplaudir.
-- El aplauso devuelve al jugador al museo.
+- Al terminar la misión, el mentor (voz en off) pide volver al museo.
+- El pellizco (o mantener el puño cerrado) devuelve al jugador al museo.
 - El mentor aparece físicamente y da una conclusión breve.
 
 ## 8. Misión lunar — Apollo 17
@@ -203,30 +204,33 @@ Animación corta e informativa entre la vitrina del LRV y la misión lunar. Guio
 - Cámara en primera persona, con las manos del astronauta visibles.
 - Halo azul celeste sobre la roca de Station 1, cerca de Steno Crater.
 - Sitio: valle de Taurus-Littrow, junto al LM Challenger, 1 h después del inicio de la EVA-1 (12 dic. 1972, 00:54 UTC). Sol y Tierra según la tabla del ALSJ (Sol a 15.7° de altura y azimut 96.8°; Tierra a 45.3° y azimut 240.7°, gibosa al 68 %). Estrellas del catálogo Hipparcos en su posición real, muy tenues. Datos y fuentes en `src/visual/sitioApollo17.ts` y `src/visual/cielo.ts`.
-- El jugador llega a pie: camina y mira como en el museo, sin atravesar el LM ni el LRV. Para subir, se acerca al LRV (3.2 m) y aplaude. Lejos del LRV, el aplauso no lo sienta y el mentor le pide acercarse.
+- El jugador llega a pie: camina y mira como en el museo, sin atravesar el LM ni el LRV. Para subir, se acerca al LRV (3.2 m) y junta el pulgar y el índice. Lejos del LRV, el pellizco no lo sienta y el mentor le pide acercarse.
 - Despliegue del LRV: el LRV empieza plegado en la bahía del cuadrante suroeste del LM, con la parte de abajo del chasis hacia fuera, como viajó (ALSJ, NSSDC). Mientras está plegado o desplegándose no se puede subir ni conducir, y se muestra "Mantén E para desplegar el LRV". Mantener E llena un anillo en el centro de la pantalla en 3 s (`SEGUNDOS_MANTENER_DESPLEGAR`); soltarla antes lo vacía en 0.35 s sin desplegar nada. Con el anillo lleno, E queda bloqueada y se reproduce la secuencia real de Apollo 17 (117:26–117:48 GET, unos 21 min) acortada a 44.5 s: liberación con la anilla en D, inclinación con la cinta, a 45° se abre el chasis trasero y saltan sus ruedas, ruedas traseras al suelo y apertura del delantero a 73°, bajada del frente, retiro y alineación hacia el este, guardabarros, asientos y consola, encendido y prueba de manejo (marcha atrás para apartarse del LM, por fuera de la pata sur y un bucle hasta la posición de estacionamiento), y montaje de la LCRU, las antenas, la cámara y el geopallet. El mentor lo cuenta en seis frases. Fases, tiempos y fuentes en `src/visual/despliegueApollo17.ts`; el recorrido de la prueba de manejo y las medidas de la bahía son del modelo, no de una fuente.
 - Sentado en el asiento del comandante (izquierdo, con el mando en T a la derecha), el giro de la cabeza o el ratón mueve solo la vista (hasta ±100° del rumbo).
 - Simplificación de juego: la roca y su cráter de ~20 m están a ~45 m del LRV, no a los ~1.1 km reales de la estación 1. El LRV aparca apuntando a la roca. Los textos de la misión lo dicen.
 
 ### 8.2 Conducción
 
-- Dirección: volante gestual con ambas manos. La cabeza no controla el LRV.
-- Manos centradas = recto.
-- Girar ambas manos izquierda o derecha = giro correspondiente.
-- Zona neutral configurable.
-- Avance: subir las rodillas (caminar en el sitio). El LRV avanza 2.25 veces lo caminado: a la velocidad máxima de caminata (1.2 m/s) va a 2.7 m/s, su velocidad máxima de diseño (6 mph).
-- Al dejar de caminar, el vehículo se detiene.
-- Ruedas: las cuatro eran direccionables y, en el modo normal, las traseras giraban en sentido contrario a las delanteras, con un radio de giro de 3.1 m (NSSDC). En el juego, el ángulo de las ruedas sigue al volante: Ackermann en los dos ejes, hasta 50° la rueda interior y ~22° la exterior. Sin manos, las ruedas se quedan en el último ángulo; al detenerse conservan el ángulo y dejan de rodar en unas décimas de segundo. Ruedan según la velocidad, en sentido contrario al retroceder.
-- Bajarse: pellizco (pulgar e índice, sección 5.4) con las dos manos a la vez y los otros tres dedos extendidos, sostenido 0.4 s, con cooldown de 1.5 s; con teclado, la tecla B. Solo sentado y fuera del golpe y el agarre. El vehículo se detiene donde está y el jugador queda de pie junto al asiento del comandante. El LRV conserva su posición y la muestra, si ya se recogió. A pie, el aplauso junto al LRV vuelve a sentarlo; con la muestra recogida, el aplauso vuelve al museo.
+- Mano derecha = palanca del mando en T (como en el LRV real, un solo mando entre los asientos). Sentado, la mano derecha del avatar siempre sostiene la palanca, agarrando la barra de la T, y se mueve con ella siguiendo el movimiento real del jugador: hacia adelante, hacia atrás y a los lados. Se juega con el puño de pie, como sujetando una palanca. La cabeza no controla el LRV (solo mueve la vista).
+- Lectura de la mano (`posturaMando` en `src/tracking/gestures.ts`): adelante y atrás, por el ancho de los nudillos (índice a meñique) en anchos de hombros, que crece al acercar la mano a la cámara; a los lados, por el centro de los nudillos respecto al hombro derecho. `src/game/mandoLRV.ts` lo convierte en la posición de la palanca (−1…1 en cada eje): el punto neutro se toma al sentarse, promediando 0.5 s (y otra vez si la mano se pierde más de 1.5 s); a tope con 15 % de la distancia a la cámara adelante o atrás y 0.45 anchos de hombros a un lado; suavizado de 0.08 s.
+- Zona neutral de 0.15 en cada eje (`MANDO_ZONA_NEUTRAL` en `src/game/luna.ts`).
+- Adelante: acelera hasta 5 m/s (palanca a tope) a 0.5 m/s².
+- Atrás: en marcha, frena (hasta 1 m/s² con la palanca a tope). Ya parado, seguir tirando da marcha atrás, hasta 1.5 m/s. El LRV real pedía activar antes un interruptor del mando (NSSDC); el juego lo activa solo y se ve abatirse en la palanca. Simplificación de juego.
+- Palanca centrada: el LRV se va parando solo (0.7 m/s²).
+- A los lados: las ruedas giran en proporción, y el LRV gira al rodar (no en el sitio), con el radio de giro mínimo de 3.1 m a tope y como mucho 60°/s; marcha atrás, el morro gira al otro lado.
+- Vista: la palanca real queda unos 50° por debajo de la vista al frente, fuera de la pantalla, así que sentado se dibuja una copia de la misma palanca abajo a la derecha, con el guante derecho y la manga del traje (`src/visual/vistaMando.ts`), y la real se oculta. La copia sigue el rumbo del LRV y el cabeceo, no el giro de la cabeza. La palanca se inclina como mucho 22° (`INCLINACION_MAX_MANDO_LRV`, del modelo, // VERIFICAR).
+- Mano izquierda: libre. Se dibuja como siempre, siguiendo a la mano real, pero no agarra objetos, no activa controles ni choca con nada.
+- Teclado: W y S llevan la palanca adelante y atrás, A y D a los lados (con 0.15 s de suavizado, para que se vea moverse).
+- Ruedas: las cuatro eran direccionables y, en el modo normal, las traseras giraban en sentido contrario a las delanteras, con un radio de giro de 3.1 m (NSSDC). En el juego, el ángulo de las ruedas sigue a la palanca: Ackermann en los dos ejes, hasta 50° la rueda interior y ~22° la exterior. Sin datos de la mano, las ruedas se quedan en el último ángulo; al detenerse conservan el ángulo y dejan de rodar en unas décimas de segundo. Ruedan según la velocidad, en sentido contrario al retroceder.
+- Bajarse: pellizco sentado (sección 5.2); con teclado, la tecla B. Solo sentado y con la misión sin cumplir. Mientras el mentor explica los controles la primera vez, el pellizco no hace nada. El vehículo se detiene donde está y el jugador queda de pie junto al asiento del comandante. El LRV conserva su posición y la muestra, si ya se recogió. A pie, el pellizco junto al LRV vuelve a sentarlo; con la muestra recogida, vuelve al museo.
 - El LRV no atraviesa el LM ni la roca, y no se aleja más de 260 m del LM.
 
 ### 8.3 Recolección
 
-1. Al llegar cerca de la roca resaltada, el jugador da un golpe con una mano (movimiento rápido hacia abajo).
-2. Con la otra mano hace un gesto de agarre (pellizco o cierre de mano).
-3. La muestra aparece en la mano del astronauta.
-4. La misión termina.
-5. El mentor felicita (voz y subtítulos) y pide aplaudir para volver al museo.
+1. El jugador conduce el LRV hasta el suelo naranja (halo azul). El mentor le avisa al acercarse.
+2. Se baja del LRV (pellizco) y, a pie junto al suelo, mantiene el puño cerrado 3 s (teclado: E).
+3. La misión termina: el mentor felicita (voz y subtítulos) y empieza la cinemática del despegue (sección 8.8).
+- Ya no hay golpe ni agarre: sentado, las manos solo conducen.
 
 ### 8.4 Error
 
@@ -240,7 +244,7 @@ Animación corta e informativa entre la vitrina del LRV y la misión lunar. Guio
 ### 8.6 Precisión histórica
 
 - Los astronautas de Apollo usaron martillos, pinzas y palas. No se usa pico.
-- Golpear y recoger es una simplificación interactiva, no la secuencia exacta de gestos reales.
+- Recoger con el puño cerrado es una simplificación interactiva, no la secuencia exacta de gestos reales.
 - No se inventan números de catálogo ni se identifica el fragmento como muestra específica sin verificarlo.
 
 ### 8.8 Cinemática final: el despegue
@@ -250,7 +254,7 @@ Animación corta e informativa entre la vitrina del LRV y la misión lunar. Guio
 - Datos: el LRV queda aparcado en su posición final vista por LRO (128 m al este-sureste del LM) con la cámara hacia el LM; la cámara la manejaba un operador en Houston. La llama del motor de ascenso es casi invisible en el vacío, así que se dibuja tenue. Aproximado (VERIFICAR): posición de la bandera, subida vertical de ~10 s y giro de ~52° hacia el oeste. La bajada del Sol en el plano final es un recurso visual, no un dato.
 - Tiempos y textos en `src/game/cinematicaDespegue.json` (se ajustan sin tocar el código). Lógica en `src/game/cinematicaDespegue.ts`, escena en `src/visual/despegueLM.ts`, capa de pantalla en `src/ui/cinematicaUi.ts`.
 - Botón "Omitir" (o Enter): pasa directo al final. Si se recarga la página a mitad, tras elegir el control se vuelve a la Luna y la cinemática sigue donde estaba (localStorage `museo-espacial:cinematica-despegue:v1`).
-- Al terminar, modo libre: el módulo de ascenso ya no está, el jugador queda a pie detrás del LRV y puede caminar y mirar; el aplauso vuelve al museo (con teclado, mantener E). Las huellas del LRV en la Luna se dibujan desde que se conduce.
+- Al terminar, modo libre: el módulo de ascenso ya no está, el jugador queda a pie detrás del LRV y puede caminar y mirar; el pellizco vuelve al museo (con teclado, mantener E). Las huellas del LRV en la Luna se dibujan desde que se conduce.
 
 ### 8.7 Modo de movilidad limitada — deshabilitado en beta
 
@@ -259,7 +263,7 @@ Animación corta e informativa entre la vitrina del LRV y la misión lunar. Guio
   - El avance se hace moviendo los brazos como si caminara: se detecta la oscilación de muñecas y codos y se convierte en avance, con una lógica análoga a la de las rodillas.
   - El LRV avanza hasta quedar cerca de la roca y se detiene solo.
 - Detrás de un flag desactivado en el código.
-- Pendiente: si la dirección sigue con volante o se automatiza.
+- Pendiente: si la dirección sigue con la palanca o se automatiza.
 
 ## 9. Misión marciana — Perseverance
 
@@ -292,7 +296,7 @@ Animación corta e informativa entre la vitrina del LRV y la misión lunar. Guio
 
 ### 9.4 Final
 
-- Tras confirmar, el mentor felicita y pide aplaudir para volver al museo.
+- Tras confirmar, el mentor felicita y pide el pellizco para volver al museo.
 
 ## 10. Halo azul celeste (todas las misiones)
 
@@ -347,7 +351,7 @@ El panel muestra solo lo que el jugador cambia. El resto de ajustes de `src/game
 - [ ] Umbrales de caminar por rodillas validados con cámara real.
 - [x] Pantalla de inicio con elección de control; la elección persiste al recargar. Si la cámara falla, se ofrece el modo teclado (verificado en Chrome sin webcam).
 - [x] Pantalla de inicio “The Museum of Stars” (`src/ui/inicioUi.ts`): portada con un remolino de estrellas animado (shader WebGL2 en `src/ui/remolinoEstelar.ts`, con degradado fijo si no hay WebGL2) y, en la misma página, nombre del viajero, idioma y control. El nombre se guarda en localStorage (`museo-espacial:viajero:v1`) y Robi lo usa al saludar.
-- [x] Modo teclado y ratón: W A S D, espacio (aplaudir: entrar, subir al LRV y volver al museo), clic izquierdo (señalar y, en la Luna, golpear), E (golpear y agarrar con un segundo toque, y mantenida: desplegar, recoger y volver al museo), M (volver a la pantalla de modos), clic derecho y Esc. Verificado en Chrome sin interfaz: seleccionar la vitrina del LRV, entrar, sentarse, conducir hasta la roca, golpe, agarre y volver al museo. En modo teclado no se pide la cámara.
+- [x] Modo teclado y ratón: W A S D (en el LRV, la palanca), espacio (confirmar: entrar, subir al LRV y volver al museo), clic izquierdo (señalar), E mantenida (desplegar, recoger y volver al museo), B (bajarse), M (volver a la pantalla de modos), clic derecho y Esc. Verificado en Chrome sin interfaz: seleccionar la vitrina del LRV, entrar, sentarse, conducir hasta la roca y volver al museo (antes de quitar el golpe). En modo teclado no se pide la cámara.
 - [ ] Mirar con el ratón con pointer lock real en un navegador con ventana (la lógica se probó simulando la captura del ratón).
 - [ ] Modo cámara después de separar la capa de entrada (`src/input/`): probado solo con la webcam simulada de Chrome (carga MediaPipe y pide encuadre). Falta probar calibración y gestos con cámara real.
 - [ ] Manos como guantes de traje con fuelles (spec-visual-museo.md, sección 9): verificadas con manos sintéticas; falta verlas con cámara real.
@@ -356,10 +360,12 @@ El panel muestra solo lo que el jugador cambia. El resto de ajustes de `src/game
 - [ ] Despliegue del LRV desde la bahía del LM (mantener E, anillo y animación por fases): probado en Chrome sin interfaz con teclado, de la llegada a la Luna a subirse al LRV desplegado, y la secuencia revisada en capturas. Falta verlo en un navegador con ventana y decidir un gesto para el modo cámara.
 - [ ] Presentación del LRV entre la vitrina y la misión lunar (sección 7.4), con la cámara sincronizada con cada frase en español e inglés: guion probado con `node --test tests/presentacionLRV.test.ts` y tomas revisadas en capturas sin interfaz (`tests/capturas/presentacion/`). Falta verla en un navegador con ventana y con voz.
 - [ ] Cinemática del despegue (sección 8.8): línea de tiempo probada con `node --test tests/cinematicaDespegue.test.ts`, tomas revisadas en capturas sin interfaz (`tests/capturas/despegue/`) y, en Chrome sin interfaz con teclado, reanudar tras recargar, Omitir y caminar en el modo libre. Falta verla en un navegador con ventana, con cámara real y llegando desde la recogida de la muestra.
-- [x] Pantalla de modos (`src/ui/modosUi.ts`): al señalar el holograma del moon buggy, Robi lo explica como siempre y, al aplaudir (o pulsar espacio), en vez de entrar directo sale un cuadro en el centro y tres cuadrantes: Historia del moon buggy (la presentación del LRV y la misión lunar de siempre), Taller 3D y Exploración libre. Robi explica cada uno al pasar el cursor o enfocarlo; señalar un cuadro (ratón con el botón izquierdo sostenido, o dedo índice) muestra un anillo que se llena en 1.5 s y elige ese modo: Robi lo explica y pide aplaudir o pulsar espacio para entrar (aplaudir sin elegir no hace nada); con el teclado, Tab elige el cuadro enfocado (Robi lo describe) y Enter entra al momento (sin atajos numéricos; Robi pide apuntar a la opción que se prefiera), y «Volver al museo» cierra la pantalla. Diseño low poly (esquinas cortadas, facetas planas, paleta del museo): «Elige cómo explorar» junto a la etiqueta del moon buggy, tres cuadrantes con su descripción breve cuyos centros forman un triángulo (dos arriba y uno abajo) y, de fondo, un moon buggy que recorre a lo lejos el horizonte curvo de la Luna (`src/ui/fondoLunar.ts`). Al salir del taller vuelve a esta pantalla. Probado en Chrome sin interfaz con teclado.
+- [x] Pantalla de modos (`src/ui/modosUi.ts`): al señalar el holograma del moon buggy, Robi lo explica como siempre y, al pellizcar (o pulsar espacio), en vez de entrar directo sale un cuadro en el centro y tres cuadrantes: Historia del moon buggy (la presentación del LRV y la misión lunar de siempre), Taller 3D y Exploración libre. Robi explica cada uno al pasar el cursor o enfocarlo; señalar un cuadro (ratón con el botón izquierdo sostenido, o dedo índice) muestra un anillo que se llena en 1.5 s y elige ese modo: Robi lo explica y pide el pellizco o pulsar espacio para entrar (pellizcar sin elegir no hace nada); con el teclado, Tab elige el cuadro enfocado (Robi lo describe) y Enter entra al momento (sin atajos numéricos; Robi pide apuntar a la opción que se prefiera), y «Volver al museo» cierra la pantalla. Diseño low poly (esquinas cortadas, facetas planas, paleta del museo): «Elige cómo explorar» junto a la etiqueta del moon buggy, tres cuadrantes con su descripción breve cuyos centros forman un triángulo (dos arriba y uno abajo) y, de fondo, un moon buggy que recorre a lo lejos el horizonte curvo de la Luna (`src/ui/fondoLunar.ts`). Al salir del taller vuelve a esta pantalla. Probado en Chrome sin interfaz con teclado.
 - [x] Exploración libre (`MisionLuna` con `libre`, `visual.museo.fijarLunaLibre`): la Luna con solo el moon buggy (sin módulo lunar, roca ni halo), el jugador ya sentado y con el LRV desplegado. Mantener E vuelve al museo.
 - [x] Taller 3D del LRV (`src/visual/tallerLRV.ts`, `src/ui/tallerUi.ts`, `src/game/desarmeLRV.ts`): el LRV flota sobre fondo blanco y la tecla D (o el botón) lo desarma en 1.2 s, con retraso escalonado y las piezas quietas al terminar; al armar vuelven a su sitio con error < 0.001 (`node --test tests/desarmeLRV.test.ts`). Cada primitiva del modelo es una pieza (677). Clic en una pieza: borde cian, línea guía y tarjeta con nombre y función, en español o inglés en vivo. Cámara tipo TinkerCAD sin zoom (OrbitControls con la distancia fija, 11.8 m, para que el vehículo desarmado quepa: arrastrar orbita, Shift o clic derecho desplaza; flechas o W A S llevan la cámara a los lados, arriba y abajo por una órbita de radio constante alrededor del vehículo (la distancia no cambia nunca: la rueda del ratón no hace nada); M vuelve a la pantalla de modos; la D no mueve la cámara porque es «desarmar»). Nombres y funciones en `src/i18n/*.json` (`pieza_*`); `src/game/piezasLRV.ts` marca cuáles están confirmados en la NSSDC (26 de 71 clases) y cuáles quedan pendientes.
 - [x] Taller 3D con cámara (gestos en vez de teclas y ratón): separar las manos (puños juntos frente al pecho que se abren a los lados, `separarManos` en `src/tracking/gestures.ts`) desarma el LRV y juntarlas lo arma, en 0.4 s (`VELOCIDAD_DESARME_GESTO`; con la D sigue en 1.2 s). Inclinar la cabeza o subirla y bajarla lleva la cámara por el mismo carril que las flechas (`orbitar`). Señalar con el dedo índice una pieza o un subsistema de la lista 0.7 s lo elige como el clic (`src/game/senalarTaller.ts`, sin anillo); lo elegido se queda hasta elegir otra cosa. Se quitó el panel «Registro de desarme»; las letras son un 30 % mayores para verlas a 80 cm y «Visualización» pasó a la columna izquierda. Con teclado el taller no cambia (D desarma). Pruebas: `tests/separarManos.test.ts`, `tests/senalarTaller.test.ts` y `tests/desarmeLRV.test.ts` (las dos primeras importan `gestures.ts`, que Node no carga directo: compilarlas antes con `rolldown`).
+- [ ] Conducir el LRV con la mano derecha como palanca del mando en T (sección 8.2): `src/game/mandoLRV.ts`, `posturaMando` en `src/tracking/gestures.ts`, conducción en `src/game/luna.ts` y vista de la palanca con el guante en `src/visual/vistaMando.ts`. Pruebas: `node --test tests/luna.test.ts tests/velocidadLuna.test.ts tests/mandoLRV.test.ts`; la vista (centrada, adelante, atrás y a un lado) revisada en capturas sin interfaz. Falta probarlo con cámara real y ajustar los recorridos (`MANDO_RECORRIDO_*`).
+- [ ] Pellizco de pulgar e índice en lugar del aplauso en todo el juego (sección 5.2), también para subir al LRV y, sentado, para bajarse; sin golpe ni agarre en la misión lunar. Falta probarlo con cámara real.
 - [ ] Misión marciana.
 - [ ] Mentor y voz.
 - [ ] Publicación.

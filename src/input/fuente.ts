@@ -3,6 +3,7 @@
 // Ni game/museo.ts ni las misiones saben de qué fuente viene cada acción.
 
 import type { EntradaBalanceo } from '../game/balanceo';
+import type { PosicionMando } from '../game/mandoLRV';
 import type { ModoControl } from '../game/opciones';
 import type { GestoManos } from '../tracking/gestures';
 import type { TrackedHand } from '../tracking/tracker';
@@ -35,7 +36,7 @@ export interface LecturaEntrada {
   aviso: string | null;
   /**
    * Hay datos para moverse en este fotograma. Si es false, el movimiento se congela (SPEC 6):
-   * giro, cabeceo, caminata y señalar no cuentan, pero el aplauso sí.
+   * giro, cabeceo, caminata y señalar no cuentan, pero el pellizco de confirmar sí.
    */
   conMovimiento: boolean;
   /** Giro de la vista en grados para este fotograma (+ = derecha). Equivale a inclinar la cabeza. */
@@ -46,24 +47,27 @@ export interface LecturaEntrada {
   avanceM: number;
   /** Metros a la derecha (+) o a la izquierda (−) en este fotograma. Solo el teclado se desplaza de lado. */
   lateralM: number;
-  /** Aplauso (o barra espaciadora) en este fotograma. */
+  /**
+   * Confirmar en este fotograma: el pellizco de pulgar e índice (cámara; antes era el aplauso, de ahí el nombre) o la
+   * barra espaciadora. Entra a la vitrina, elige modo, sube al LRV y vuelve al museo. Con cámara, sentado en el LRV, el
+   * mismo pellizco llega también como `bajarse`.
+   */
   aplauso: boolean;
   /**
-   * El aplauso también vuelve al museo desde una misión: la cámara sí; el teclado no (ahí se vuelve manteniendo E y la
-   * barra espaciadora solo entra a la vitrina o sube al LRV).
+   * Confirmar también vuelve al museo desde una misión: la cámara sí; el teclado no (ahí se vuelve manteniendo E y
+   * la barra espaciadora solo entra a la vitrina o sube al LRV).
    */
   aplausoVuelve: boolean;
   /** Señal de la mano que señala, o null si no hay nada que mostrar. */
   senal: Senal | null;
   /** El pellizco de la mano que señala se acaba de cerrar. */
   pellizcoNuevo: boolean;
-  /** Cierre nuevo del agarre en cualquiera de las dos manos (misión lunar). */
-  agarreNuevo: boolean;
-  /** Velocidad de golpe hacia abajo, en hombros/s (misión lunar). 0 si no hay golpe. */
-  golpeHombrosS: number;
-  /** Ángulo del volante en grados (+ = derecha), o null si no hay volante (manos no visibles). */
-  volanteGrados: number | null;
-  /** Bajarse del LRV en este fotograma: tecla B, o pellizco sostenido con las dos manos (misión lunar). */
+  /**
+   * Palanca del mando en T del LRV (misión lunar): con cámara, la sigue la mano derecha (game/mandoLRV.ts); con teclado,
+   * W/S y A/D. null si no hay datos en este fotograma.
+   */
+  mando: PosicionMando | null;
+  /** Bajarse del LRV en este fotograma: tecla B, o el pellizco de confirmar con cámara (misión lunar). */
   bajarse: boolean;
   /** Gesto de manos del taller 3D (cámara): separarlas desarma el LRV y juntarlas de nuevo lo arma. */
   gestoManos: GestoManos | null;
@@ -71,7 +75,7 @@ export interface LecturaEntrada {
   desplegarMantenido: boolean;
   /**
    * Puño cerrado mantenido (cámara): hace lo mismo que mantener E, salvo señalar vitrinas. Va aparte de la tecla porque
-   * sentado en el LRV las manos hacen de volante, cerradas, y entonces no debe contar (lo decide juego.ts).
+   * sentado en el LRV la mano derecha sujeta la palanca, cerrada, y entonces no debe contar (lo decide juego.ts).
    */
   punoMantenido: boolean;
   /** Manos para el avatar: dibujarlas, ocultarlas o dejarlas como están (null). */
@@ -86,6 +90,8 @@ export interface FuenteEntrada {
   leer(ahoraS: number): LecturaEntrada;
   /** Pausa la entrada mientras el panel de opciones está abierto (las teclas no cuentan). */
   pausar(pausada: boolean): void;
+  /** El jugador se acaba de sentar en el LRV: la palanca toma de nuevo su punto neutro (cámara). */
+  recentrarMando(): void;
 }
 
 /** Lectura sin acciones: todo a cero. Cada fuente rellena lo que tenga. */
@@ -105,9 +111,7 @@ export function lecturaVacia(ahoraS: number): LecturaEntrada {
     aplausoVuelve: true,
     senal: null,
     pellizcoNuevo: false,
-    agarreNuevo: false,
-    golpeHombrosS: 0,
-    volanteGrados: null,
+    mando: null,
     bajarse: false,
     gestoManos: null,
     desplegarMantenido: false,

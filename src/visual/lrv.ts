@@ -650,6 +650,17 @@ function asientoPiezas(l: Lote, x: number): void {
 const BASE_MANDO: V3 = [0, Y_ASIENTO + 0.1, Z_ASIENTO - 0.2];
 /** Punto sobre el que pivota la palanca del mando en T: lo alto de su fuelle gris. */
 export const PIVOTE_MANDO_LRV: V3 = [0, BASE_MANDO[1] + 0.06, BASE_MANDO[2] - 0.005];
+/**
+ * Inclinación máxima de la palanca del mando en T (rad), hacia cualquier lado: la usan la presentación y la palanca que
+ * mueve el jugador. Se aplica al pivote `mando_T` como rotation.set(−adelante·i, 0, −lado·i). // VERIFICAR: recorrido
+ * real del mando.
+ */
+export const INCLINACION_MAX_MANDO_LRV = THREE.MathUtils.degToRad(22);
+/**
+ * Centro de la barra de la T, donde la agarra la mano derecha, en ejes del pivote `mando_T` (m): la cima del tubo
+ * ([0, Y_ASIENTO + 0.32, Z_ASIENTO − 0.24] en ejes del LRV) menos PIVOTE_MANDO_LRV.
+ */
+export const AGARRE_MANDO_LRV: V3 = [0, Y_ASIENTO + 0.32 - PIVOTE_MANDO_LRV[1], Z_ASIENTO - 0.24 - PIVOTE_MANDO_LRV[2]];
 
 /**
  * Mando en T entre los asientos (a la derecha del comandante): la base en `l` y la palanca en `palanca` (cuelga de su

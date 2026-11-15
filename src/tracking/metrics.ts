@@ -15,6 +15,7 @@ export const HAND_IDX = {
   indexMcp: 5,
   indexPip: 6,
   middleMcp: 9,
+  ringMcp: 13,
   pinkyMcp: 17,
   indexTip: 8,
   middlePip: 10,

@@ -31,6 +31,7 @@ import {
   RUEDAS_LRV,
   VIA_LRV,
   POSE_DESPLEGADO,
+  INCLINACION_MAX_MANDO_LRV as INCLINACION_MANDO,
   crearLRVLuna,
   type PlegadoLRV,
   type RuedasLRV,
@@ -72,8 +73,6 @@ const RUMBO_LRV = SOL.azimut + 125;
 const GROSOR_CONTORNO_PX = 2.6;
 /** Ángulo (°) a partir del cual una arista entre dos caras se dibuja en el contorno. */
 const ANGULO_ARISTA = 32;
-/** Inclinación máxima de la palanca del mando en T en la animación (rad). // VERIFICAR: recorrido real del mando. */
-const INCLINACION_MANDO = THREE.MathUtils.degToRad(22);
 /** Diámetro del marco de tope dentro de cada rueda: 64.8 cm (NSSDC). // VERIFICAR: su forma (aquí, dos aros con riostras). */
 const RADIO_MARCO_INTERIOR = 0.324;
 /** Sombras: caja de ±LADO_SOMBRA_M alrededor del LRV. */

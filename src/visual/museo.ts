@@ -20,6 +20,8 @@ import { alturaLuna, crearHundimientoSuelo } from './lunaTerreno';
 import { DURACION_DESPLIEGUE_LRV_S } from './despliegueApollo17';
 import { crearDespliegueLRV, type DespliegueVisualLRV } from './despliegueLRV';
 import { crearManos, type ManoDetectada, type ManosAvatar, type OpcionesManos } from './manos';
+import { crearVistaMando, inclinarPalanca, ponerInterruptor, puntosPunoMando, type VistaMando } from './vistaMando';
+import type { PosicionMando } from '../game/mandoLRV';
 import { ARQ } from './paleta';
 import { crearCassiniExhibicion, crearLRVExhibicion } from './props';
 import {
@@ -165,6 +167,12 @@ let sentadoLRV = false;
 let miradaLRV = 0;
 /** LRV de la escena lunar y su rumbo actual (°), para apoyar la cámara y esquivarlo a pie. */
 let lrvLuna: THREE.Object3D | null = null;
+/** Palanca del mando en T del LRV de la escena (pivote `mando_T`). */
+let palancaLuna: THREE.Object3D | null = null;
+/** Sentado: copia de la palanca abajo a la derecha, con el guante derecho fijado en ella (vistaMando.ts). */
+let vistaMando: VistaMando | null = null;
+/** El guante derecho está fijado en la palanca (sentado en el LRV). */
+let manoEnPalanca = false;
 let rumboLRV = 0;
 /** Ruedas del LRV (dirección y rodadura) y la última posición del LRV, para saber cuánto avanzó. */
 let ruedasLRV: RuedasLRV | null = null;
@@ -233,6 +241,36 @@ function actualizarCamara(): void {
     camara.position.y += balanceo.verticalM;
   }
   camara.rotation.set(cabeceo, yaw, conBalanceo ? THREE.MathUtils.degToRad(balanceo.rollGrados) : 0, 'YXZ');
+  // Sentado, la palanca va con los ojos, el rumbo del LRV y el cabeceo (no con el giro de la cabeza).
+  if (manoEnPalanca && vistaMando) vistaMando.colocar(camara.position, -THREE.MathUtils.degToRad(rumboLRV), cabeceo);
+}
+
+/**
+ * Sentado en el LRV: la mano derecha agarra la palanca (copia abajo a la derecha, vistaMando.ts) y la palanca real se
+ * oculta. La mano izquierda sigue libre, con el seguimiento de siempre.
+ */
+function agarrarPalanca(): void {
+  if (manoEnPalanca || !vistaMando || !manosAvatar) return;
+  manoEnPalanca = true;
+  vistaMando.objeto.visible = true;
+  if (palancaLuna) palancaLuna.visible = false;
+  manosAvatar.fijar('Right', { padre: vistaMando.palanca, puntos: puntosPunoMando() });
+}
+
+/** Al bajarse o salir de la Luna: la mano derecha vuelve a seguir al jugador y la palanca real, centrada, se ve. */
+function soltarPalanca(): void {
+  if (!manoEnPalanca) return;
+  manoEnPalanca = false;
+  if (vistaMando) {
+    vistaMando.objeto.visible = false;
+    vistaMando.inclinar(0, 0, false);
+  }
+  if (palancaLuna) {
+    palancaLuna.visible = true;
+    inclinarPalanca(palancaLuna, 0, 0);
+    ponerInterruptor(palancaLuna, false);
+  }
+  manosAvatar?.fijar('Right', null);
 }
 
 /** Fija la postura de la caminata para este fotograma. Solo se aplica en el museo y a pie en la Luna. */
@@ -314,6 +352,11 @@ async function iniciar(container: HTMLElement): Promise<void> {
   hundirSueloLuna = terrenoLuna instanceof THREE.Mesh ? crearHundimientoSuelo(terrenoLuna, ROCA_ESTACION1.x, ROCA_ESTACION1.z) : null;
   progresoRecogidaLuna = -1;
   lrvLuna = nodos.get('escena_luna')?.getObjectByName('lrv_placeholder') ?? null;
+  palancaLuna = lrvLuna?.getObjectByName('mando_T') ?? null;
+  if (palancaLuna) {
+    vistaMando = crearVistaMando(palancaLuna);
+    escenaNueva.add(vistaMando.objeto);
+  }
   ruedasLRV = (lrvLuna?.userData.ruedas as RuedasLRV | undefined) ?? null;
   despliegueLRV = lrvLuna ? crearDespliegueLRV(lrvLuna) : null;
   const escenaLuna = nodos.get('escena_luna');
@@ -451,6 +494,7 @@ function entrarEscena(escena: Escena): void {
   cabeceo = 0;
   vaciarMovimientoPendiente();
   sentadoLRV = false;
+  soltarPalanca();
   miradaLRV = 0;
   ruedasLRV?.reiniciar();
   posicionPreviaLRV = null;
@@ -477,6 +521,7 @@ function volverAlMuseo(): void {
   mostrarMuseo(true);
   activarAmbiente('museo');
   sentadoLRV = false;
+  soltarPalanca();
   if (guardadaMuseo) {
     posicion = guardadaMuseo.posicion;
     yaw = guardadaMuseo.yaw;
@@ -749,6 +794,10 @@ function actualizarLuna(estado: {
   dtS: number;
   sentado: boolean;
   haloVisible: boolean;
+  /** Palanca del mando en T tal como la mueve el jugador (−1…1). null: se queda como estaba. */
+  mando?: PosicionMando | null;
+  /** Interruptor de marcha atrás del mando activado. */
+  marchaAtras?: boolean;
 }): void {
   rumboLRV = estado.rumboGrados;
   const rad = THREE.MathUtils.degToRad(estado.rumboGrados);
@@ -765,11 +814,18 @@ function actualizarLuna(estado: {
   if (haloRoca) haloRoca.visible = estado.haloVisible;
   if (estado.sentado && lrvLuna) {
     if (!sentadoLRV) miradaLRV = 0;
+    agarrarPalanca();
+    if (estado.mando) {
+      vistaMando?.inclinar(estado.mando.adelante, estado.mando.lado, estado.marchaAtras ?? false);
+      // La palanca real (oculta) se mueve igual, por si algo la enseña.
+      if (palancaLuna) inclinarPalanca(palancaLuna, estado.mando.adelante, estado.mando.lado);
+    }
     ojosEnLRV(lrvLuna, posicion);
     yaw = -THREE.MathUtils.degToRad(estado.rumboGrados) + miradaLRV;
     actualizarCamara();
   } else if (sentadoLRV && lrvLuna) {
     // Se acaba de bajar: de pie junto al asiento del comandante (a la izquierda), mirando hacia donde miraba.
+    soltarPalanca();
     // Si ese punto quedara fuera de RADIO_LRV_M (el LRV puede estar en el borde), se prueba el otro lado y, si no,
     // un paso hacia el LM: así no se empuja al jugador de vuelta al bajarse.
     const izquierda = new THREE.Vector3(-Math.cos(rad), 0, -Math.sin(rad)).multiplyScalar(DISTANCIA_BAJADA_LRV_M);
@@ -944,6 +1000,7 @@ function iniciarDespegue(): boolean {
   enDespegue = true;
   lrvAparcadoDespegue = false;
   sentadoLRV = false;
+  soltarPalanca();
   if (haloRoca) haloRoca.visible = false;
   manosAvatar?.ocultar();
   despegue.preparar();

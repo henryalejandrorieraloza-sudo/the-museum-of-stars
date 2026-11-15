@@ -1,7 +1,8 @@
-import { HAND_IDX, otrosDedosExtendidos, palmDistanceRatio, pinchRatio } from './metrics';
+import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
+import { HAND_IDX, POSE_IDX, otrosDedosExtendidos, palmDistanceRatio, pinchRatio, punoCerrado, shoulderWidthPx } from './metrics';
 import type { TrackedHand } from './tracker';
 
-// Gestos de SPEC 5.2 (aplauso), 5.4 (pellizco), 4 (inclinación de mano) y 8.2 (volante).
+// Gestos de SPEC 5.2 (aplauso, solo en /debug/), 5.4 (pellizco, el gesto de confirmar del juego), 4 (inclinación de mano) y 8.2 (mando en T del LRV).
 // Todas las funciones son puras: el estado que necesitan (cooldown del aplauso) se pasa y se devuelve.
 
 /** Umbrales por defecto. Cada función los acepta como parámetro. */
@@ -231,6 +232,57 @@ export function pellizco(
   if (!mano) return null;
   const distancia = pinchRatio(mano, w, h);
   return { distancia, cerrado: distancia < umbral };
+}
+
+// ---------------------------------------------------------------------------
+// Pellizco de confirmar: el gesto que sustituye al aplauso en todo el juego (SPEC 5.2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Tiempo (s) que hay que sostener el pellizco para que confirme. 0 = en cuanto se cierra, como el pellizco de
+ * Perseverance (pellizcoNuevo en camaraFuente.ts), que Henry probó y le funciona bien.
+ */
+export const PELLIZCO_CONFIRMAR_SOSTENER_S = 0;
+/** Tras confirmar, tiempo (s) sin otro, para que un pellizco que parpadea en el umbral no confirme dos veces. */
+export const PELLIZCO_CONFIRMAR_COOLDOWN_S = 1;
+
+export interface PellizcoConfirmarEstado {
+  /** Desde cuándo (s) hay una mano pellizcando; null si ninguna. */
+  desdeS: number | null;
+  /** false tras confirmar, hasta que se abran los dedos: sostener el pellizco no vuelve a confirmar. */
+  armado: boolean;
+  /** Última confirmación (s), para el cooldown. */
+  ultimoS: number;
+}
+
+export const pellizcoConfirmarEstadoInicial: PellizcoConfirmarEstado = {
+  desdeS: null,
+  armado: true,
+  ultimoS: Number.NEGATIVE_INFINITY,
+};
+
+/**
+ * Pellizco (pulgar e índice juntos, el de Perseverance) con una mano o con las dos: confirma al cerrarse (o tras
+ * PELLIZCO_CONFIRMAR_SOSTENER_S), una vez por pellizco: hay que abrir los dedos de las dos manos para repetir, con
+ * PELLIZCO_CONFIRMAR_COOLDOWN_S. Un puño cerrado no cuenta aunque el pulgar quede junto al índice (así, la mano derecha
+ * en la palanca del LRV no confirma; en capturas de Henry, la pinza mide 0.11–0.14 y no es puño, y el puño mide 0.35).
+ * Función pura.
+ */
+export function pellizcoConfirmar(
+  hands: TrackedHand[],
+  w: number,
+  h: number,
+  estado: PellizcoConfirmarEstado,
+  ahoraS: number,
+  umbral = PELLIZCO_UMBRAL_DEFAULT,
+): { detectado: boolean; estado: PellizcoConfirmarEstado } {
+  const alguna = hands.some((m) => (pellizco(m, w, h, umbral)?.cerrado ?? false) && !punoCerrado(m, w, h));
+  if (!alguna) return { detectado: false, estado: { ...estado, desdeS: null, armado: true } };
+  const desdeS = estado.desdeS ?? ahoraS;
+  const listo =
+    estado.armado && ahoraS - desdeS >= PELLIZCO_CONFIRMAR_SOSTENER_S && ahoraS - estado.ultimoS >= PELLIZCO_CONFIRMAR_COOLDOWN_S;
+  if (!listo) return { detectado: false, estado: { ...estado, desdeS } };
+  return { detectado: true, estado: { desdeS, armado: false, ultimoS: ahoraS } };
 }
 
 // ---------------------------------------------------------------------------
@@ -505,4 +557,51 @@ export function volante(
 
   const zonaActual: ZonaVolante = grados > neutral ? 'derecha' : grados < -neutral ? 'izquierda' : 'neutral';
   return { grados, zona: zonaActual };
+}
+
+// ---------------------------------------------------------------------------
+// Mano derecha en el mando en T del LRV (SPEC 8.2)
+// ---------------------------------------------------------------------------
+
+/** Visibilidad mínima del hombro derecho para medir la postura del mando. */
+const MANDO_HOMBRO_VISIBILIDAD_MIN = 0.5;
+
+/** Postura de la mano derecha que sujeta el mando en T del LRV, en un fotograma. */
+export interface PosturaMando {
+  /**
+   * Ancho de los nudillos (índice a meñique) en anchos de hombros. Crece al acercar la mano a la cámara (empujar la
+   * palanca) y baja al recogerla hacia el hombro. Con el puño de pie, los nudillos quedan de cara a la cámara en las
+   * dos posturas, así que este ancho no se acorta por la perspectiva como el largo de la palma.
+   */
+  tamano: number;
+  /** Centro de los nudillos respecto al hombro derecho, en anchos de hombros. + = hacia la derecha del jugador. */
+  lateral: number;
+}
+
+/**
+ * Postura de la mano derecha del jugador para el mando del LRV, o null si no se ve la mano derecha o el hombro
+ * derecho. La imagen no está en espejo: la derecha del jugador queda a la izquierda de la imagen. Función pura.
+ */
+export function posturaMando(
+  hands: TrackedHand[],
+  pose: NormalizedLandmark[] | null,
+  w: number,
+  h: number,
+): PosturaMando | null {
+  const mano = hands.find((m) => m.label === 'Right');
+  if (!mano || !pose) return null;
+  const hombro = pose[POSE_IDX.rightShoulder];
+  if (!hombro || (hombro.visibility ?? 1) < MANDO_HOMBRO_VISIBILIDAD_MIN) return null;
+  const ancho = shoulderWidthPx(pose, w, h);
+  if (!(ancho >= 1)) return null;
+  const indice = mano.landmarks[HAND_IDX.indexMcp];
+  const menique = mano.landmarks[HAND_IDX.pinkyMcp];
+  const medio = mano.landmarks[HAND_IDX.middleMcp];
+  const anular = mano.landmarks[HAND_IDX.ringMcp];
+  if (!indice || !menique || !medio || !anular) return null;
+  const tamano = Math.hypot((indice.x - menique.x) * w, (indice.y - menique.y) * h) / ancho;
+  const centroX = ((indice.x + medio.x + anular.x + menique.x) / 4) * w;
+  const lateral = (hombro.x * w - centroX) / ancho;
+  if (!Number.isFinite(tamano) || !Number.isFinite(lateral) || tamano <= 0) return null;
+  return { tamano, lateral };
 }

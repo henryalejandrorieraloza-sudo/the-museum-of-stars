@@ -1,32 +1,28 @@
 // Fuente de entrada por teclado y ratón. No abre la cámara ni carga MediaPipe.
 // Produce la misma lectura que la cámara (fuente.ts), así el museo y las misiones no cambian:
 //
-//   W / S           caminar hacia delante / atrás (misma velocidad máxima y aceleración que en Opciones)
-//   A / D           paso lateral en el museo; volante del LRV en la misión lunar
+//   W / S           caminar hacia delante / atrás (misma velocidad máxima y aceleración que en Opciones); en el LRV,
+//                   palanca del mando en T hacia delante (acelerar) o atrás (frenar y, ya parado, marcha atrás)
+//   A / D           paso lateral en el museo; en el LRV, palanca a los lados (girar)
 //   Ratón           mirar (pointer lock); equivale a inclinar y cabecear la cabeza
-//   Espacio         aplaudir: entrar a la vitrina, subir al LRV y volver al museo (igual que el aplauso)
-//   Clic izq.       mantener para señalar la vitrina del centro de la pantalla; en la Luna, golpe y, con un
-//                   segundo clic, agarre de la muestra
-//   E               en la Luna, golpe y, con un segundo toque, agarre de la muestra
+//   Espacio         confirmar: entrar a la vitrina, subir al LRV y volver al museo (igual que el aplauso)
+//   Clic izq.       mantener para señalar la vitrina del centro de la pantalla
 //   E mantenida     acción de carga: desplegar el LRV, recoger el suelo naranja o, si no hay otra cosa que cargar
 //                   en la misión, volver al museo (solo la tecla, no el clic)
 //   M               en una misión, el taller o la exploración libre, volver a la pantalla de modos
-//   Clic der.       pellizco y agarre
+//   Clic der.       pellizco
 //   B               bajarse del LRV (misión lunar)
 //   Esc             abrir Opciones
 
 import { TIEMPO_FRENADO_S } from '../game/caminata';
-import { GOLPE_VELOCIDAD_HOMBROS_S } from '../game/luna';
 import type { Opciones } from '../game/opciones';
 import { t } from '../i18n';
 import { enCampoDeTexto, lecturaVacia, type FuenteEntrada, type LecturaEntrada } from './fuente';
 
 /** Grados de giro de la vista por píxel de ratón. */
 export const SENSIBILIDAD_RATON_GRADOS_POR_PX = 0.12;
-/** Ángulo del volante del LRV con A o D pulsada (°). Fuera de la zona neutral de 10°, gira a 35°/s. */
-export const VOLANTE_TECLADO_GRADOS = 45;
-/** Velocidad de golpe que produce E o clic izquierdo en la misión lunar (hombros/s): el doble del umbral. */
-export const GOLPE_TECLADO_HOMBROS_S = GOLPE_VELOCIDAD_HOMBROS_S * 2;
+/** Constante de tiempo (s) con la que la palanca del LRV va hacia donde mandan W, S, A y D (y vuelve al soltarlas). */
+export const MANDO_TECLADO_S = 0.15;
 /** Tiempo máximo (s) que cuenta una vuelta del bucle, para no saltar tras una pausa. */
 const DT_MAX_S = 0.1;
 /** Si Esc llega justo después de soltar el ratón (ms), es la misma pulsación: no se vuelve a alternar Opciones. */
@@ -52,8 +48,10 @@ export class FuenteTeclado implements FuenteEntrada {
   private ratonX = 0;
   private ratonY = 0;
   private espacioPendiente = false;
-  private golpePendiente = false;
-  private agarrePendiente = false;
+  private pellizcoPendiente = false;
+  /** Palanca del LRV: sigue a W/S y A/D con suavidad, para que se vea moverse. */
+  private mandoAdelante = 0;
+  private mandoLado = 0;
   private bajarsePendiente = false;
   /** Señalar: botón izquierdo mantenido. */
   private senalarRaton = false;
@@ -83,7 +81,7 @@ export class FuenteTeclado implements FuenteEntrada {
     document.addEventListener('mouseup', (ev) => {
       if (ev.button === 0) this.senalarRaton = false;
     });
-    // El clic derecho es el agarre: sin menú contextual sobre la escena.
+    // El clic derecho es el pellizco: sin menú contextual sobre la escena.
     document.addEventListener('contextmenu', (ev) => {
       if (this.capturado() || this.escena.contains(ev.target as Node)) ev.preventDefault();
     });
@@ -95,6 +93,9 @@ export class FuenteTeclado implements FuenteEntrada {
       if (!this.pausada) this.panel.abrir();
     });
   }
+
+  /** Con teclado la palanca no tiene punto neutro que tomar. */
+  recentrarMando(): void {}
 
   pausar(pausada: boolean): void {
     this.pausada = pausada;
@@ -125,8 +126,11 @@ export class FuenteTeclado implements FuenteEntrada {
       pasosNuevos: 0,
       pasosPorSegundo: Math.abs(this.velAvance) / this.opciones.metrosPorPaso,
     };
-    // En el LRV, A y D son el volante. Sin teclas, volante recto.
-    lectura.volanteGrados = lado * VOLANTE_TECLADO_GRADOS;
+    // En el LRV, W/S y A/D mueven la palanca del mando en T. Sin teclas, vuelve al centro.
+    const f = 1 - Math.exp(-dtS / MANDO_TECLADO_S);
+    this.mandoAdelante += (adelante - this.mandoAdelante) * f;
+    this.mandoLado += (lado - this.mandoLado) * f;
+    lectura.mando = { adelante: this.mandoAdelante, lado: this.mandoLado };
 
     // Ratón: a la derecha gira a la derecha; hacia arriba mira arriba.
     const grados = SENSIBILIDAD_RATON_GRADOS_POR_PX * this.opciones.sensibilidadRaton;
@@ -140,15 +144,12 @@ export class FuenteTeclado implements FuenteEntrada {
     lectura.aplauso = this.espacioPendiente;
     // Espacio hace lo mismo que el aplauso con cámara, también volver al museo desde una misión.
     lectura.aplausoVuelve = true;
-    lectura.golpeHombrosS = this.golpePendiente ? GOLPE_TECLADO_HOMBROS_S : 0;
-    lectura.pellizcoNuevo = this.agarrePendiente;
-    lectura.agarreNuevo = this.agarrePendiente;
+    lectura.pellizcoNuevo = this.pellizcoPendiente;
     lectura.bajarse = this.bajarsePendiente;
     lectura.desplegarMantenido = this.eMantenida;
     this.espacioPendiente = false;
     this.bajarsePendiente = false;
-    this.golpePendiente = false;
-    this.agarrePendiente = false;
+    this.pellizcoPendiente = false;
     return lectura;
   }
 
@@ -199,12 +200,6 @@ export class FuenteTeclado implements FuenteEntrada {
       ev.preventDefault();
       if (!ev.repeat) this.espacioPendiente = true;
     } else if (ev.code === 'KeyE') {
-      // Cada toque de E es golpe y agarre a la vez: la misión usa el primero para golpear la roca y el siguiente toque
-      // para agarrar la muestra (en el mismo fotograma, el golpe gana).
-      if (!ev.repeat) {
-        this.golpePendiente = true;
-        this.agarrePendiente = true;
-      }
       this.eMantenida = true;
     } else if (ev.code === 'KeyB') {
       if (!ev.repeat) this.bajarsePendiente = true;
@@ -226,10 +221,8 @@ export class FuenteTeclado implements FuenteEntrada {
     if (!capturado) this.capturarRaton();
     if (ev.button === 0) {
       this.senalarRaton = true;
-      this.golpePendiente = true;
-      this.agarrePendiente = true;
     } else if (ev.button === 2) {
-      this.agarrePendiente = true;
+      this.pellizcoPendiente = true;
     }
   }
 

@@ -1,20 +1,17 @@
 // Fuente de entrada por cámara (gestos): webcam + MediaPipe. Encuadre y calibración (SPEC 2.1 y 3),
-// y traducción de cada fotograma a la lectura común (fuente.ts): cabeza, rodillas, aplauso, señalar,
-// pellizco, volante, golpe y agarre. La lógica es la misma que antes vivía en juego.ts.
+// y traducción de cada fotograma a la lectura común (fuente.ts): cabeza, rodillas, pellizco de confirmar, señalar,
+// pellizco y la palanca del LRV con la mano derecha. La lógica es la misma que antes vivía en juego.ts.
 
 import { checkFraming, type FramingStatus } from '../tracking/framing';
 import {
-  aplauso,
-  aplausoEstadoInicial,
   pellizco,
+  pellizcoConfirmar,
+  pellizcoConfirmarEstadoInicial,
   PUNO_GRACIA_S,
-  pellizcoDoble,
-  pellizcoDobleEstadoInicial,
+  posturaMando,
   separarManos,
   separarManosEstadoInicial,
-  volante,
-  type AplausoEstado,
-  type PellizcoDobleEstado,
+  type PellizcoConfirmarEstado,
   type SepararManosEstado,
 } from '../tracking/gestures';
 import {
@@ -33,6 +30,7 @@ import { Caminata } from '../game/caminata';
 import { Calibrador, cargarCalibracion, guardarCalibracion, type Calibracion } from '../game/calibracion';
 import { CursorSuavizado, puntaACursor } from '../game/cursor';
 import { cabeceoCabeza, direccionSenalar, giroCabeza } from '../game/gestos';
+import { MandoLRV } from '../game/mandoLRV';
 import type { Opciones } from '../game/opciones';
 import { descargarCaptura } from '../ui/captura';
 import { t } from '../i18n';
@@ -54,18 +52,18 @@ export class FuenteCamara implements FuenteEntrada {
   /** Si el pellizco de la mano que señala estaba cerrado en el fotograma anterior. */
   private pellizcoCerrado = false;
   private pasosVistos = 0;
-  private aplausoEstado: AplausoEstado = aplausoEstadoInicial;
-  /** Pellizco sostenido con las dos manos: bajarse del LRV. */
-  private pellizcoDobleEstado: PellizcoDobleEstado = pellizcoDobleEstadoInicial;
+  /**
+   * Pellizco de confirmar (pulgar e índice, como en Perseverance): hace lo que antes el aplauso (entrar, elegir modo,
+   * subir al LRV y volver al museo) y, sentado en el LRV, baja de él.
+   */
+  private confirmarEstado: PellizcoConfirmarEstado = pellizcoConfirmarEstadoInicial;
+  /** Palanca del mando en T del LRV, que sigue a la mano derecha. */
+  private readonly mando = new MandoLRV();
   /** Manos que se separan o se juntan: desarmar o armar el LRV en el taller. */
   private separarEstado: SepararManosEstado = separarManosEstadoInicial;
   private ultimoFrescoS: number | null = null;
   private ultimoDatoS = Number.NEGATIVE_INFINITY;
-  /** Última posición (px) y tiempo de cada muñeca, para medir la velocidad de golpe (SPEC 8.3). */
-  private readonly munecasPrevias: Partial<Record<'Left' | 'Right', { y: number; ahoraS: number }>> = {};
-  /** Pellizco cerrado en el fotograma anterior, por mano (agarre de la misión lunar). */
-  private readonly pellizcosAgarre: Partial<Record<'Left' | 'Right', boolean>> = {};
-  /** Barra espaciadora: respaldo del aplauso (SPEC 4). Se consume en la siguiente lectura. */
+  /** Barra espaciadora: respaldo del pellizco de confirmar (SPEC 4). Se consume en la siguiente lectura. */
   private espacioPendiente = false;
   /** Tecla E mantenida: respaldo del puño cerrado (desplegar, recoger, volver). */
   private eMantenida = false;
@@ -119,6 +117,10 @@ export class FuenteCamara implements FuenteEntrada {
       cerrarWebcam(video);
       throw err;
     }
+  }
+
+  recentrarMando(): void {
+    this.mando.recentrar();
   }
 
   pausar(pausada: boolean): void {
@@ -185,14 +187,11 @@ export class FuenteCamara implements FuenteEntrada {
     this.pasosVistos = pasosTotales;
 
     const shoulderPx = frame.pose ? shoulderWidthPx(frame.pose, frame.width, frame.height) : null;
-    const ap = aplauso(frame.hands, shoulderPx, frame.width, frame.height, this.aplausoEstado, ahoraS);
-    this.aplausoEstado = ap.estado;
-    // Golpe y agarre se miden en cada fotograma, para que su estado anterior esté siempre al día.
-    lectura.golpeHombrosS = this.velocidadGolpe(frame, ahoraS, shoulderPx);
-    lectura.agarreNuevo = this.agarreNuevo(frame);
-    lectura.volanteGrados = volante(frame.hands, frame.width, frame.height)?.grados ?? null;
-    const doble = pellizcoDoble(frame.hands, frame.width, frame.height, this.pellizcoDobleEstado, ahoraS);
-    this.pellizcoDobleEstado = doble.estado;
+    const confirmar = pellizcoConfirmar(frame.hands, frame.width, frame.height, this.confirmarEstado, ahoraS);
+    this.confirmarEstado = confirmar.estado;
+    // La palanca se mide en cada fotograma (también calibrando), para que su punto neutro y su suavizado sigan al día.
+    lectura.mando = this.mando.actualizar(ahoraS, dtS, posturaMando(frame.hands, frame.pose, frame.width, frame.height));
+
     const separar = separarManos(frame.hands, shoulderPx, frame.width, frame.height, this.separarEstado, ahoraS);
     this.separarEstado = separar.estado;
 
@@ -213,10 +212,12 @@ export class FuenteCamara implements FuenteEntrada {
     lectura.hayDatos = true;
     // Balanceo de la cámara (solo visual): cada paso detectado es un extremo. No usa el roll ni cambia la detección.
     lectura.balanceo = { caminando: estadoPiernas.walking && roll !== null, pasosNuevos: pasos, pasosPorSegundo: null };
-    // Entrar y volver a la escena solo con aplauso o barra espaciadora (SPEC 5.2 y 7.2).
-    lectura.aplauso = ap.detectado || (espacio && !this.pausada);
-    // Bajarse del LRV: solo la misión lunar lo usa, y solo con el jugador sentado.
-    lectura.bajarse = doble.detectado && !this.pausada;
+    // El pellizco (o la barra espaciadora) confirma: entrar y volver a la escena, elegir modo y subir al LRV (SPEC 5.2
+    // y 7.2). Sentado en el LRV, el mismo pellizco baja de él (la misión mira `bajarse` antes).
+    // Como antes el aplauso, el pellizco cuenta aunque la entrada esté en pausa: la pantalla de modos pausa el juego
+    // ('menu') y se confirma justo con este gesto. Bajarse del LRV, en cambio, solo sin pausa.
+    lectura.aplauso = confirmar.detectado || (espacio && !this.pausada);
+    lectura.bajarse = confirmar.detectado && !this.pausada;
     // Separar y juntar las manos solo lo usa el taller 3D, que pausa la entrada; juego.ts decide si cuenta.
     lectura.gestoManos = separar.gesto;
     // Señalar y pellizco dependen solo de la mano que señala.
@@ -260,34 +261,6 @@ export class FuenteCamara implements FuenteEntrada {
       senal = ultima ? { tipo: 'cursor', x: ultima.x, y: ultima.y, activo: false } : null;
     }
     lectura.senal = senal;
-  }
-
-  /** Velocidad máxima hacia abajo de las muñecas, en hombros/s (SPEC 8.3). Negativa o cero si suben o no hay datos. */
-  private velocidadGolpe(frame: TrackingFrame, ahoraS: number, shoulderPx: number | null): number {
-    let mayor = 0;
-    for (const mano of frame.hands) {
-      if (mano.label === 'Unknown') continue;
-      const y = mano.landmarks[HAND_IDX.wrist].y * frame.height;
-      const previa = this.munecasPrevias[mano.label];
-      this.munecasPrevias[mano.label] = { y, ahoraS };
-      if (!previa || shoulderPx === null || shoulderPx < 1) continue;
-      const dtS = ahoraS - previa.ahoraS;
-      if (dtS <= 0) continue;
-      mayor = Math.max(mayor, (y - previa.y) / shoulderPx / dtS);
-    }
-    return mayor;
-  }
-
-  /** Cierre nuevo del pellizco en cualquiera de las dos manos: el agarre de la misión lunar (SPEC 8.3). */
-  private agarreNuevo(frame: TrackingFrame): boolean {
-    let nuevo = false;
-    for (const lado of ['Left', 'Right'] as const) {
-      const mano = frame.hands.find((m) => m.label === lado);
-      const cerrado = pellizco(mano, frame.width, frame.height)?.cerrado ?? false;
-      if (cerrado && !this.pellizcosAgarre[lado]) nuevo = true;
-      this.pellizcosAgarre[lado] = cerrado;
-    }
-    return nuevo;
   }
 }
 

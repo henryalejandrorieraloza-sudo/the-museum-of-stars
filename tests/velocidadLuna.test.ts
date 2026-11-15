@@ -1,18 +1,20 @@
 // Pruebas de los topes de velocidad de la misión lunar (src/game/luna.ts): a pie, el LRV y su aceleración y frenado.
 // Ejecutar: node --test tests/velocidadLuna.test.ts  (Node 22.6+ quita los tipos de forma nativa; sin dependencias).
-// Las estimaciones (MOON_WALK_MAX_SPEED, LRV_MAX_SPEED, LRV_ACCEL, LRV_BRAKE) están en src/game/luna.ts.
+// Las estimaciones (MOON_WALK_MAX_SPEED, LRV_MAX_SPEED, LRV_ACCEL, LRV_BRAKE, LRV_RUEDA_LIBRE) están en src/game/luna.ts.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   LRV_ACCEL,
   LRV_BRAKE,
+  LRV_MAX_REVERSA,
   LRV_MAX_SPEED,
+  LRV_RUEDA_LIBRE,
   MOON_WALK_MAX_SPEED,
   MisionLuna,
   acercarVelocidadLRV,
   metrosAPieLuna,
-  objetivoVelocidadLRV,
+  objetivoMandoLRV,
   type EntradaLuna,
 } from '../src/game/luna.ts';
 import { Caminata, type OpcionesCaminata } from '../src/game/caminata.ts';
@@ -28,10 +30,7 @@ function fotograma(extra: Partial<EntradaLuna> = {}): EntradaLuna {
     ahoraS: 0,
     dtS: DT,
     aplauso: false,
-    metros: 0,
-    volanteGrados: null,
-    velocidadGolpeHombrosS: 0,
-    agarreNuevo: false,
+    mando: { adelante: 0, lado: 0 },
     jugador: { x: 0, z: 0 },
     ...extra,
   };
@@ -73,32 +72,28 @@ test('con cadencia alta y velocidad de Opciones alta, la caminata a pie no pasa 
 
 // --- Aceleración y frenado -------------------------------------------------------------------------------------
 
-test('la velocidad del LRV acelera y frena como mucho a LRV_ACCEL y LRV_BRAKE, y se para en el objetivo', () => {
+test('la velocidad del LRV se acerca al objetivo como mucho a la tasa dada, y se para en él', () => {
   let v = 0;
-  let maxAcel = 0;
+  let maxPaso = 0;
   for (let i = 0; i < 30 * 30; i++) {
     const previa = v;
-    v = acercarVelocidadLRV(v, LRV_MAX_SPEED, DT);
-    maxAcel = Math.max(maxAcel, v - previa);
+    v = acercarVelocidadLRV(v, LRV_MAX_SPEED, LRV_ACCEL, DT);
+    maxPaso = Math.max(maxPaso, v - previa);
   }
-  assert.ok(maxAcel <= LRV_ACCEL * DT + EPS, `aceleración ${maxAcel / DT} m/s²`);
+  assert.ok(maxPaso <= LRV_ACCEL * DT + EPS, `aceleración ${maxPaso / DT} m/s²`);
   assert.equal(v, LRV_MAX_SPEED);
-
-  let maxFrenado = 0;
-  for (let i = 0; i < 30 * 30; i++) {
-    const previa = v;
-    v = acercarVelocidadLRV(v, 0, DT);
-    maxFrenado = Math.max(maxFrenado, previa - v);
-  }
-  assert.ok(maxFrenado <= LRV_BRAKE * DT + EPS, `frenado ${maxFrenado / DT} m/s²`);
+  for (let i = 0; i < 30 * 30; i++) v = acercarVelocidadLRV(v, 0, LRV_BRAKE, DT);
   assert.equal(v, 0);
 });
 
-test('el objetivo del LRV nunca pasa de LRV_MAX_SPEED aunque se camine mucho más rápido', () => {
-  assert.equal(objetivoVelocidadLRV(10 * DT, DT), LRV_MAX_SPEED);
-  assert.equal(objetivoVelocidadLRV(-10 * DT, DT), -LRV_MAX_SPEED);
-  assert.equal(objetivoVelocidadLRV(0, DT), 0);
-  assert.equal(objetivoVelocidadLRV(1, 0), 0, 'sin tiempo no hay velocidad');
+test('el objetivo de la palanca nunca pasa de los topes, y frena en contra de la marcha', () => {
+  assert.equal(objetivoMandoLRV(1, 0).objetivo, LRV_MAX_SPEED);
+  assert.equal(objetivoMandoLRV(1, 0).tasa, LRV_ACCEL);
+  assert.equal(objetivoMandoLRV(-1, 0).objetivo, -LRV_MAX_REVERSA, 'parado, atrás es marcha atrás');
+  assert.deepEqual(objetivoMandoLRV(-1, 3), { objetivo: 0, tasa: LRV_BRAKE }, 'en marcha, atrás frena a tope');
+  assert.deepEqual(objetivoMandoLRV(1, -1), { objetivo: 0, tasa: LRV_BRAKE }, 'marcha atrás, adelante frena');
+  assert.deepEqual(objetivoMandoLRV(0, 3), { objetivo: 0, tasa: LRV_RUEDA_LIBRE }, 'centrada, se va parando');
+  assert.ok(objetivoMandoLRV(-0.4, 3).tasa >= LRV_RUEDA_LIBRE, 'tirar un poco nunca frena menos que soltar');
 });
 
 // --- LRV en la misión --------------------------------------------------------------------------------------------
@@ -113,15 +108,14 @@ function velocidad(a: { z: number }, b: { z: number }): number {
   return Math.abs(b.z - a.z) / DT;
 }
 
-test('el LRV en la misión nunca pasa de 5 m/s y acelera con suavidad', () => {
+test('con la palanca a tope el LRV nunca pasa de 5 m/s y acelera con suavidad', () => {
   const m = lrvLibre();
   let previa = m.posicion;
   let velPrevia = 0;
   let maxVel = 0;
   let maxSubida = 0;
-  // Caminando muy rápido en el sitio (3 m/s): la caminata quiere más que el tope del LRV.
   for (let i = 0; i < 30 * 15; i++) {
-    m.update(fotograma({ metros: 3 * DT }));
+    m.update(fotograma({ mando: { adelante: 1, lado: 0 } }));
     const ahora = m.posicion;
     const v = velocidad(previa, ahora);
     maxVel = Math.max(maxVel, v);
@@ -134,34 +128,26 @@ test('el LRV en la misión nunca pasa de 5 m/s y acelera con suavidad', () => {
   assert.ok(maxSubida <= LRV_ACCEL * DT + 1e-6, `aceleración ${maxSubida / DT} m/s²`);
 });
 
-test('al dejar de caminar, el LRV se detiene en un tiempo razonable (≤ 6 s desde 5 m/s)', () => {
+/** Lleva el LRV a su tope y cuenta los segundos hasta pararse con la palanca en `adelante`. */
+function segundosHastaParar(adelante: number): number {
   const m = lrvLibre();
-  // Primero se llega a la velocidad máxima caminando rápido.
-  let previa = m.posicion;
-  let velPrevia = 0;
-  for (let i = 0; i < 30 * 15; i++) {
-    m.update(fotograma({ metros: 3 * DT }));
-    velPrevia = velocidad(previa, m.posicion);
-    previa = m.posicion;
-  }
-  assert.ok(velPrevia > LRV_MAX_SPEED - 0.1, `antes de frenar debe ir cerca del tope: ${velPrevia} m/s`);
-
-  // Luego se deja de caminar: el LRV debe frenar hasta parar.
-  let parado = false;
-  let maxFrenado = 0;
+  for (let i = 0; i < 30 * 15; i++) m.update(fotograma({ mando: { adelante: 1, lado: 0 } }));
+  assert.ok(m.velocidad > LRV_MAX_SPEED - 0.1, `antes de frenar debe ir cerca del tope: ${m.velocidad} m/s`);
   let frames = 0;
-  while (frames < 30 * 6 && !parado) {
-    m.update(fotograma({ metros: 0 }));
+  while (frames < 30 * 20 && m.velocidad > 0) {
+    m.update(fotograma({ mando: { adelante, lado: 0 } }));
     frames++;
-    const v = velocidad(previa, m.posicion);
-    maxFrenado = Math.max(maxFrenado, velPrevia - v);
-    parado = v < 1e-6;
-    previa = m.posicion;
-    velPrevia = v;
   }
-  assert.ok(parado, 'el LRV debe pararse dentro de 6 s');
-  const segundos = frames * DT;
-  // Desde 5 m/s con 1 m/s² son 5 s: el tiempo debe ser de ese orden.
-  assert.ok(segundos >= LRV_MAX_SPEED / LRV_BRAKE - 0.2 && segundos <= 6, `se detuvo en ${segundos.toFixed(2)} s`);
-  assert.ok(maxFrenado <= LRV_BRAKE * DT + 1e-6, `frenado ${maxFrenado / DT} m/s²`);
+  return frames * DT;
+}
+
+test('tirando de la palanca a tope, el LRV se para en ~5 s desde 5 m/s', () => {
+  const s = segundosHastaParar(-1);
+  assert.ok(s >= LRV_MAX_SPEED / LRV_BRAKE - 0.2 && s <= LRV_MAX_SPEED / LRV_BRAKE + 0.2, `se detuvo en ${s.toFixed(2)} s`);
+});
+
+test('soltando la palanca, el LRV se va parando solo en un tiempo razonable', () => {
+  const s = segundosHastaParar(0);
+  assert.ok(Math.abs(s - LRV_MAX_SPEED / LRV_RUEDA_LIBRE) < 0.2, `se detuvo en ${s.toFixed(2)} s`);
+  assert.ok(s <= 8, 'no debe tardar demasiado');
 });

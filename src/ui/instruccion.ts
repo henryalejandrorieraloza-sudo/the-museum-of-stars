@@ -1,8 +1,14 @@
 import { requireEl } from './dom';
 
+/** Símbolo que acompaña al texto: el pellizco de pulgar e índice (👌) con cámara, o ninguno. */
+export type SimboloInstruccion = 'pellizco' | null;
+
 export interface InstruccionUi {
-  /** Caja con lo que el jugador tiene que hacer ahora (texto ya en el idioma y control activos). null la oculta. */
-  mostrar(texto: string | null): void;
+  /**
+   * Caja con lo que el jugador tiene que hacer ahora (texto ya en el idioma y control activos) y, si hace falta, el
+   * símbolo del gesto. null la oculta.
+   */
+  mostrar(texto: string | null, simbolo?: SimboloInstruccion): void;
 }
 
 /**
@@ -12,14 +18,18 @@ export interface InstruccionUi {
 export function crearInstruccion(): InstruccionUi {
   const caja = requireEl('instruccion');
   const texto = requireEl('instruccionTexto');
+  const icono = requireEl('instruccionSimbolo');
   let actual: string | null = null;
+  let simboloActual: SimboloInstruccion = null;
 
   return {
-    mostrar(nuevo) {
-      if (nuevo === actual) return;
+    mostrar(nuevo, simbolo = null) {
+      if (nuevo === actual && simbolo === simboloActual) return;
       actual = nuevo;
+      simboloActual = simbolo;
       caja.hidden = nuevo === null;
       texto.textContent = nuevo ?? '';
+      icono.hidden = simbolo === null;
     },
   };
 }
