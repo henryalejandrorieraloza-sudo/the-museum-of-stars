@@ -1778,8 +1778,15 @@
   }
 }
 
+/* Pantallas estrechas: sin la columna izquierda, la webcam del taller va abajo a la izquierda (la columna derecha la taparía). */
 @media (max-width: 1080px) {
   .taller-columna--izq {
     display: none;
+  }
+  body:has(.taller:not([hidden])) .camara {
+    right: auto;
+    left: 16px;
+    bottom: 56px;
+    transform: scaleX(-1);
   }
 }
