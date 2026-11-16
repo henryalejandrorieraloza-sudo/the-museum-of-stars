@@ -386,7 +386,7 @@
   }
 }
 
-/* Pantalla de inicio "The Museum of Stars": remolino de estelas de estrellas (src/ui/remolinoEstelar.ts) y, encima, la portada
+/* Pantalla de inicio "Orbit": remolino de estelas de estrellas (src/ui/remolinoEstelar.ts) y, encima, la portada
    y los pasos de nombre, idioma y control (src/ui/inicioUi.ts). Tapa la escena del museo mientras carga. */
 .inicio {
   --inicio-azul: #8fb4ff;

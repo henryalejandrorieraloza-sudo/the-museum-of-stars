@@ -1,4 +1,4 @@
-// Pantalla de inicio "The Museum of Stars": portada con un remolino de estelas de estrellas y, en la misma página,
+// Pantalla de inicio "Orbit": portada con un remolino de estelas de estrellas y, en la misma página,
 // tres pasos: nombre del viajero → idioma → control (cámara o teclado). Al elegir el control empieza el museo.
 // Si la cámara falla, se vuelve a mostrar solo el paso del control con el error encima.
 
